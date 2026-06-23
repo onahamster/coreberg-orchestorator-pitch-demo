@@ -115,7 +115,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         resetDemo();
       } else if (e.key === 's' || e.key === 'S') {
         e.preventDefault();
-        stepForward();
+        const ctx = getContextName();
+        if (ctx === 'social' || ctx === 'ads' || ctx === 'llmo') {
+          stepForward(ctx);
+        } else {
+          stepForward('social');
+          stepForward('ads');
+          stepForward('llmo');
+        }
       }
     };
 
@@ -239,36 +246,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </nav>
         </div>
 
-        {/* Sidebar Footer (Admin option hidden discreetly) */}
-        <div className="p-4 border-t border-border-custom bg-bg-subtle/50 space-y-3">
-          {/* Internal Hidden shortcut helper */}
-          <div className="text-[10px] text-text-muted/60 leading-normal px-2">
-            <div>デモ操作（キーボード）:</div>
-            <div className="flex justify-between mt-1">
-              <span>再生/一時停止</span>
-              <kbd className="px-1 bg-bg-surface border border-border-strong rounded">.</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>リセット</span>
-              <kbd className="px-1 bg-bg-surface border border-border-strong rounded">R</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>ステップ送り</span>
-              <kbd className="px-1 bg-bg-surface border border-border-strong rounded">S</kbd>
-            </div>
-          </div>
-
-          <Link
-            href="/admin"
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-[11px] font-medium transition-all ${
-              pathname === '/admin'
-                ? 'bg-text-primary text-bg-surface'
-                : 'text-text-secondary hover:text-text-primary hover:bg-bg-subtle'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span>Playback Settings & Preset</span>
-          </Link>
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-border-custom bg-bg-subtle/30 text-center">
+          <span className="text-[10px] text-text-muted">Coreberg Orchestrator v2.0.0</span>
         </div>
       </aside>
 

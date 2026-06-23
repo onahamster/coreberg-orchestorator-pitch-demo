@@ -3,24 +3,18 @@
 import React from 'react';
 import Link from 'next/link';
 import { useDemoStore } from '@/store/demoStore';
+import TerminalLog from '@/components/TerminalLog';
 import { 
   Share2, 
   TrendingUp, 
   Search, 
   ArrowRight,
-  Database,
   Brain,
-  CheckCircle,
-  Play,
-  Pause,
-  RotateCcw
+  CheckCircle
 } from 'lucide-react';
 
 export default function OrchestratorPage() {
   const isPlaying = useDemoStore((state) => state.isPlaying);
-  const startDemo = useDemoStore((state) => state.startDemo);
-  const pauseDemo = useDemoStore((state) => state.pauseDemo);
-  const resetDemo = useDemoStore((state) => state.resetDemo);
   const activeScenarioId = useDemoStore((state) => state.activeScenarioId);
   const scenarios = useDemoStore((state) => state.scenarios);
   const orchestratorProgress = useDemoStore((state) => state.orchestratorProgress);
@@ -28,14 +22,14 @@ export default function OrchestratorPage() {
   // Active Scenario Content
   const scenario = scenarios.find(s => s.id === activeScenarioId) || scenarios[0];
 
-  // Derive agent states
-  const socialStepIndex = useDemoStore((state) => state.socialStepIndex);
+  // Agent States
+  const socialState = useDemoStore((state) => state.socialState);
   const socialMetrics = useDemoStore((state) => state.socialMetrics);
   
-  const adsStepIndex = useDemoStore((state) => state.adsStepIndex);
+  const adsState = useDemoStore((state) => state.adsState);
   const adsMetrics = useDemoStore((state) => state.adsMetrics);
 
-  const llmoStepIndex = useDemoStore((state) => state.llmoStepIndex);
+  const llmoState = useDemoStore((state) => state.llmoState);
   const llmoScores = useDemoStore((state) => state.llmoScores);
 
   // Format currency
@@ -48,6 +42,15 @@ export default function OrchestratorPage() {
     const scores = Object.values(llmoScores);
     if (scores.length === 0) return 0;
     return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  };
+
+  // Determine active task/step name based on tasks list status
+  const getAgentRunningTask = (tasks: any[]) => {
+    const running = tasks.find(t => t.status === 'running');
+    if (running) return running.label;
+    const allCompleted = tasks.every(t => t.status === 'completed');
+    if (allCompleted) return '全タスク最適化完了';
+    return '起動準備完了';
   };
 
   return (
@@ -116,64 +119,37 @@ export default function OrchestratorPage() {
 
               {/* Node 3: SNS Agent */}
               <g transform="translate(20, 166)">
-                <rect width="120" height="42" rx="6" fill="#FFFFFF" stroke={socialStepIndex > 0 ? '#0bbfca' : '#E6EDED'} strokeWidth="1" />
+                <rect width="120" height="42" rx="6" fill="#FFFFFF" stroke={socialState.status !== 'idle' ? '#0bbfca' : '#E6EDED'} strokeWidth="1" />
                 <text x="60" y="21" textAnchor="middle" fill="#5A6A6B" fontSize="10" fontWeight="bold">SNS Agent</text>
-                <text x="60" y="33" textAnchor="middle" fill={socialStepIndex === 3 ? '#0d9f6e' : '#93A1A1'} fontSize="8">
-                  {socialStepIndex === 3 ? '✓ Optimized' : isPlaying ? 'Running...' : 'Idle'}
+                <text x="60" y="33" textAnchor="middle" fill={socialState.status === 'completed' ? '#0d9f6e' : '#93A1A1'} fontSize="8">
+                  {socialState.status === 'completed' ? '✓ Optimized' : isPlaying ? 'Running...' : 'Idle'}
                 </text>
               </g>
 
               {/* Node 4: Ad Agent */}
               <g transform="translate(215, 166)">
-                <rect width="120" height="42" rx="6" fill="#FFFFFF" stroke={adsStepIndex > 0 ? '#0bbfca' : '#E6EDED'} strokeWidth="1" />
+                <rect width="120" height="42" rx="6" fill="#FFFFFF" stroke={adsState.status !== 'idle' ? '#0bbfca' : '#E6EDED'} strokeWidth="1" />
                 <text x="60" y="21" textAnchor="middle" fill="#5A6A6B" fontSize="10" fontWeight="bold">Ad Campaign Agent</text>
-                <text x="60" y="33" textAnchor="middle" fill={adsStepIndex === 3 ? '#0d9f6e' : '#93A1A1'} fontSize="8">
-                  {adsStepIndex === 3 ? '✓ Optimized' : isPlaying ? 'Running...' : 'Idle'}
+                <text x="60" y="33" textAnchor="middle" fill={adsState.status === 'completed' ? '#0d9f6e' : '#93A1A1'} fontSize="8">
+                  {adsState.status === 'completed' ? '✓ Optimized' : isPlaying ? 'Running...' : 'Idle'}
                 </text>
               </g>
 
               {/* Node 5: LLMO Agent */}
               <g transform="translate(410, 166)">
-                <rect width="120" height="42" rx="6" fill="#FFFFFF" stroke={llmoStepIndex > 0 ? '#0bbfca' : '#E6EDED'} strokeWidth="1" />
+                <rect width="120" height="42" rx="6" fill="#FFFFFF" stroke={llmoState.status !== 'idle' ? '#0bbfca' : '#E6EDED'} strokeWidth="1" />
                 <text x="60" y="21" textAnchor="middle" fill="#5A6A6B" fontSize="10" fontWeight="bold">LLMO Optimizer</text>
-                <text x="60" y="33" textAnchor="middle" fill={llmoStepIndex === 2 ? '#0d9f6e' : '#93A1A1'} fontSize="8">
-                  {llmoStepIndex === 2 ? '✓ Citations Updated' : isPlaying ? 'Running...' : 'Idle'}
+                <text x="60" y="33" textAnchor="middle" fill={llmoState.status === 'completed' ? '#0d9f6e' : '#93A1A1'} fontSize="8">
+                  {llmoState.status === 'completed' ? '✓ Citations Updated' : isPlaying ? 'Running...' : 'Idle'}
                 </text>
               </g>
             </svg>
           </div>
 
-          {/* Quick Info & Manual Controls (For user testing preview) */}
-          <div className="border-t border-border-custom pt-4 mt-auto flex items-center justify-between">
-            <span className="text-[10px] text-text-muted">
-              ※ デモ収録時: /admin から進行速度やシナリオプリセットを調整可能です。
+          <div className="border-t border-border-custom pt-4 mt-auto">
+            <span className="text-[10px] text-text-muted leading-relaxed">
+              Coreberg Orchestratorは、各チャネルの実行APIエンドポイントと常時接続し、リアルタイムデータに基づいて自律最適化を実行しています。
             </span>
-            <div className="flex gap-2">
-              <button 
-                onClick={resetDemo}
-                className="p-2 rounded-lg border border-border-custom hover:bg-bg-subtle text-text-secondary cursor-pointer transition-colors"
-                title="Reset Flow"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-              {isPlaying ? (
-                <button 
-                  onClick={pauseDemo}
-                  className="px-3 py-1.5 rounded-lg bg-text-primary text-bg-surface hover:bg-text-secondary flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors"
-                >
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Pause</span>
-                </button>
-              ) : (
-                <button 
-                  onClick={startDemo}
-                  className="px-3 py-1.5 rounded-lg bg-brand text-white hover:bg-brand-strong flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors shadow-sm"
-                >
-                  <Play className="w-3.5 h-3.5" fill="currentColor" />
-                  <span>Execute</span>
-                </button>
-              )}
-            </div>
           </div>
 
         </div>
@@ -192,7 +168,7 @@ export default function OrchestratorPage() {
                     <img 
                       src={scenario.product.images[0]} 
                       alt={scenario.product.name} 
-                      className="w-full h-full object-cover" 
+                      className="w-full h-full object-cover animate-fade-in" 
                     />
                   </div>
                 )}
@@ -208,28 +184,20 @@ export default function OrchestratorPage() {
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between text-xs border-b border-border-custom pb-2.5">
                   <span className="text-text-secondary">SNS Agent Status:</span>
-                  <span className={`font-semibold ${socialStepIndex === 3 ? 'text-positive' : 'text-brand-strong animate-pulse'}`}>
-                    {socialStepIndex === 0 && '企画立案中'}
-                    {socialStepIndex === 1 && 'クリエイティブ生成中'}
-                    {socialStepIndex === 2 && 'スケジュール投稿実行中'}
-                    {socialStepIndex === 3 && '運用・指標改善ループ稼働中'}
+                  <span className={`font-semibold ${socialState.status === 'completed' ? 'text-positive' : 'text-brand-strong animate-pulse'}`}>
+                    {getAgentRunningTask(socialState.tasks)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs border-b border-border-custom pb-2.5">
                   <span className="text-text-secondary">Ad Campaign Status:</span>
-                  <span className={`font-semibold ${adsStepIndex === 3 ? 'text-positive' : 'text-brand-strong animate-pulse'}`}>
-                    {adsStepIndex === 0 && 'セグメンテーション中'}
-                    {adsStepIndex === 1 && 'クリエイティブバリエーション作成中'}
-                    {adsStepIndex === 2 && 'API経由出稿中'}
-                    {adsStepIndex === 3 && 'ダッシュボード最適化実行中'}
+                  <span className={`font-semibold ${adsState.status === 'completed' ? 'text-positive' : 'text-brand-strong animate-pulse'}`}>
+                    {getAgentRunningTask(adsState.tasks)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-secondary">LLMO Optimizer Status:</span>
-                  <span className={`font-semibold ${llmoStepIndex === 2 ? 'text-positive' : 'text-brand-strong animate-pulse'}`}>
-                    {llmoStepIndex === 0 && '主要LLM露出度監査中'}
-                    {llmoStepIndex === 1 && 'エンティティ自然言語最適化中'}
-                    {llmoStepIndex === 2 && '主要LLM推奨引用インデックス更新済'}
+                  <span className={`font-semibold ${llmoState.status === 'completed' ? 'text-positive' : 'text-brand-strong animate-pulse'}`}>
+                    {getAgentRunningTask(llmoState.tasks)}
                   </span>
                 </div>
               </div>
@@ -247,6 +215,55 @@ export default function OrchestratorPage() {
           </div>
         </div>
 
+      </section>
+
+      {/* Mini terminal logging consoles for each agent */}
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-xs font-semibold text-text-secondary tracking-wider uppercase">AGENT RAW CLI FEED</h3>
+          <h2 className="text-lg font-bold text-text-primary mt-1">Real-time Executions</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs px-1 font-bold text-text-secondary">
+              <span>SNS Agent Console</span>
+              <span className="text-[10px] text-brand-strong">/social</span>
+            </div>
+            <TerminalLog 
+              logs={socialState.logs} 
+              isRunning={socialState.status === 'running'} 
+              maxHeightClass="h-44" 
+              placeholderText="SNS企画スレッド立ち上げ待機中..." 
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs px-1 font-bold text-text-secondary">
+              <span>Ad Campaign Console</span>
+              <span className="text-[10px] text-brand-strong">/ads</span>
+            </div>
+            <TerminalLog 
+              logs={adsState.logs} 
+              isRunning={adsState.status === 'running'} 
+              maxHeightClass="h-44" 
+              placeholderText="Ad入札ポート同期待機中..." 
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center text-xs px-1 font-bold text-text-secondary">
+              <span>LLMO Optimizer Console</span>
+              <span className="text-[10px] text-brand-strong">/llmo</span>
+            </div>
+            <TerminalLog 
+              logs={llmoState.logs} 
+              isRunning={llmoState.status === 'running'} 
+              maxHeightClass="h-44" 
+              placeholderText="AIインデックススキャン監査待機中..." 
+            />
+          </div>
+        </div>
       </section>
 
       {/* Integrated Dashboard Metrics Summary */}

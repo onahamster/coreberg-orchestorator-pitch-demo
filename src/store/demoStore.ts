@@ -22,7 +22,6 @@ export interface SocialPost {
 }
 
 export interface SocialConfig {
-  strategyLogs: string[];
   posts: SocialPost[];
   metrics: {
     reachRatio: number;
@@ -52,7 +51,6 @@ export interface AdsConfig {
     Google: boolean;
     TikTok: boolean;
   };
-  strategyLogs: string[];
   campaigns: AdCampaign[];
   metrics: {
     salesFrom: number;
@@ -106,7 +104,44 @@ export interface Scenario {
   llmo: LlmoConfig;
 }
 
-// Zustand store state definition
+// ----------------------------------------------------
+// V2.0 EVENT DRIVEN DEFINITIONS
+// ----------------------------------------------------
+
+export interface LogLine {
+  id: string;
+  text: string;
+  type: 'cmd' | 'info' | 'success' | 'warn';
+  timestamp: string;
+}
+
+export interface TaskItem {
+  id: string;
+  label: string;
+  status: 'pending' | 'running' | 'completed';
+  elapsed?: string;
+}
+
+export type DemoEvent =
+  | { type: 'log'; text: string; logType: 'cmd' | 'info' | 'success' | 'warn'; delay: number }
+  | { type: 'task_start'; taskId: string; delay: number }
+  | { type: 'task_done'; taskId: string; elapsedSec: number; delay: number }
+  | { type: 'post_status'; postId: string; status: 'generating' | 'ready' | 'published'; delay: number }
+  | { type: 'campaign_status'; campaignId: string; status: 'generating' | 'ready' | 'active'; delay: number }
+  | { type: 'llmo_score'; model: string; score: number; delay: number }
+  | { type: 'llmo_query'; queryIndex: number; appeared: 'yes' | 'partial' | 'no'; delay: number }
+  | { type: 'llmo_action'; actionId: string; status: 'pending' | 'running' | 'completed'; delay: number }
+  | { type: 'social_metric'; reach: number; save: number; engagement: number; saveRate: number; delay: number }
+  | { type: 'ads_metric'; sales: number; cpa: number; roas: number; spend: number; delay: number };
+
+export interface AgentState {
+  logs: LogLine[];
+  tasks: TaskItem[];
+  eventIndex: number;
+  timer: number; // ms to wait before de-queuing next event
+  status: 'idle' | 'running' | 'completed';
+}
+
 interface DemoState {
   // Config
   scenarios: Scenario[];
@@ -120,38 +155,27 @@ interface DemoState {
   jitterPct: number; // e.g. 20%
   
   // Real-time Engine States
-  // Global ticks and progresses
   orchestratorProgress: number; // 0 - 100
   
-  // Social states
-  socialStepIndex: number; // 0: Strategy, 1: Creative, 2: Publish, 3: Optimize
-  socialStepProgress: number; // 0 - 100 within step
-  socialStepDuration: number; // current step target duration in ms (with jitter)
-  socialStrategyLogsVisible: string[];
+  // Agent States
+  socialState: AgentState;
   socialPosts: SocialPost[];
   socialMetrics: { reach: number; save: number; engagement: number; saveRate: number };
 
-  // Ads states
-  adsStepIndex: number; // 0: Strategy, 1: Creative, 2: Deploy, 3: Dashboard
-  adsStepProgress: number;
-  adsStepDuration: number;
-  adsStrategyLogsVisible: string[];
+  adsState: AgentState;
   adsCampaigns: AdCampaign[];
   adsMetrics: { sales: number; cpa: number; roas: number; spend: number };
 
-  // LLMO states
-  llmoStepIndex: number; // 0: Visibility, 1: Actions, 2: Citations & Updates
-  llmoStepProgress: number;
-  llmoStepDuration: number;
+  llmoState: AgentState;
   llmoScores: { [model: string]: number };
-  llmoActions: OptimizeAction[];
   llmoQueries: QueryCheck[];
+  llmoActions: OptimizeAction[];
 
   // Actions
   startDemo: () => void;
   pauseDemo: () => void;
   resetDemo: () => void;
-  stepForward: () => void;
+  stepForward: (agent: 'social' | 'ads' | 'llmo') => void;
   setSpeed: (speed: number) => void;
   setScenario: (id: string) => void;
   updateScenario: (scenario: Scenario) => void;
@@ -172,19 +196,12 @@ const INITIAL_PRESETS: Scenario[] = [
       images: ['/images/aurali_earbuds_1.png', '/images/aurali_lifestyle_1.png']
     },
     social: {
-      strategyLogs: [
-        '商品メタデータ "AURALI Smart Earbuds" の解析完了。',
-        'コアバリューを「彫刻的な静寂」「高品位サウンド」に設定。',
-        '競合ノイズキャンセリング製品（B&O, Master & Dynamic）のポジショニング分析を実行。',
-        '主要ターゲット層：30代前後ミニマリスト、デザイナー、テックアーリーアダプター。',
-        '今週の投稿戦略カレンダー（7枠）を作成しました。配信を開始します。'
-      ],
       posts: [
         { id: 'p1', time: 'Mon 09:00', theme: '彫刻としてのプロダクトデザイン', image: '/images/aurali_earbuds_1.png', caption: '美学と技術の融合。アルミニウム削り出しによる継ぎ目のないフォルムが、耳元に彫刻のような静寂をもたらします。AURALIが生み出す、一切の無駄を省いた純粋なリスニング体験。', hashtags: ['aurali', 'minimaldesign', 'earbuds', 'audiophile'], likes: 0, comments: 0, shares: 0, status: 'pending' },
         { id: 'p2', time: 'Tue 18:00', theme: 'ライフスタイルに溶け込む音', image: '/images/aurali_lifestyle_1.png', caption: '朝の静かな一杯と、AURALI。余計なノイズを完全に遮断し、お気に入りの旋律だけを心に届ける。あなたの集中力を邪魔しない、まるで空気のような存在です。', hashtags: ['minimalist', 'workspace', 'coffeeandmusic', 'anc'], likes: 0, comments: 0, shares: 0, status: 'pending' },
         { id: 'p3', time: 'Wed 12:00', theme: 'ノイズキャンセリングの工学', image: '/images/aurali_earbuds_1.png', caption: '45dBの騒音カットと、独自の気圧感知センサー。都市の喧騒の中にいることを忘れるほど、静寂はパーソナルになります。驚異の遮音性を支える、極小の精密パーツ群。', hashtags: ['soundtech', 'acoustic', 'minimalism', 'premiumtech'], likes: 0, comments: 0, shares: 0, status: 'pending' },
         { id: 'p4', time: 'Thu 20:00', theme: 'デザイナーによるインプレッション', image: '/images/aurali_lifestyle_1.png', caption: '「ただのイヤホンではなく、耳につけるモダンなオブジェ」。著名インダストリアルデザイナーが語る、AURALIのデザインフィロソフィーとその機能美。', hashtags: ['designphilosophy', 'object', 'craftsmanship', 'industrialdesign'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p5', time: 'Fri 17:00', theme: '週末のディテール', image: '/images/aurali_earbuds_1.png', caption: '旅立ちの瞬間も、お気に入りのサウンドトラックと共に。最大30時間のバッテリーライフで、途切れることのない静寂と高揚感を提供します。', hashtags: ['traveltech', 'audio', 'earphones', 'luxurybrand'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p5', time: 'Fri 17:00', theme: '週末のディテール', image: '/images/aurali_earbuds_1.png', caption: '旅立ち of 瞬間も、お気に入りのサウンドトラックと共に。最大30時間のバッテリーライフで、途切れることのない静寂と高揚感を提供します。', hashtags: ['traveltech', 'audio', 'earphones', 'luxurybrand'], likes: 0, comments: 0, shares: 0, status: 'pending' },
         { id: 'p6', time: 'Sat 10:00', theme: '静寂を身にまとう', image: '/images/aurali_lifestyle_1.png', caption: 'どんな装いにも、スマートに溶け込む。過剰な主張を削ぎ落とし、マテリアル本来の美しさを引き出したAURALIが、あなたの日常の質を高めます。', hashtags: ['minimalfashion', 'techaccessories', 'soundscape', 'dailyroutine'], likes: 0, comments: 0, shares: 0, status: 'pending' },
         { id: 'p7', time: 'Sun 15:00', theme: '音質の純粋性への問い', image: '/images/aurali_earbuds_1.png', caption: '原音にどこまで忠実でいられるか。AURALI独自のカスタムドライバーが奏でる、歪みのない澄み渡るような高音と、深くタイトな低音。', hashtags: ['hifi', 'soundart', 'minimalaesthetic', 'premium'], likes: 0, comments: 0, shares: 0, status: 'pending' }
       ],
@@ -198,13 +215,6 @@ const INITIAL_PRESETS: Scenario[] = [
     },
     ads: {
       connections: { Meta: true, Google: true, TikTok: false },
-      strategyLogs: [
-        '配信アカウント「AURALI Official」の接続を確認。',
-        '高購買意欲層：類似製品購入者、デザイン・ガジェット関心層へのセグメンテーション完了。',
-        '広告アセットの自動生成を開始：Meta用Reelsサイズ 2パターン / Google用P-MAX 2パターン。',
-        '推定目標ROASを設定: 280% / CPA許容値 4,000円。',
-        '自動配信入札エンジンをアクティブにしました。審査へ送信します。'
-      ],
       campaigns: [
         { id: 'c1', name: 'AURALI_Brand_Concept_Meta', platform: 'Meta', budget: '¥5,000 / 日', status: 'pending', image: '/images/aurali_earbuds_1.png', cpc: 0, cpa: 0, roas: 0 },
         { id: 'c2', name: 'AURALI_Sound_Tech_Google', platform: 'Google', budget: '¥8,000 / 日', status: 'pending', image: '/images/aurali_lifestyle_1.png', cpc: 0, cpa: 0, roas: 0 },
@@ -263,13 +273,6 @@ const INITIAL_PRESETS: Scenario[] = [
       images: ['/images/lin_apparel_1.png', '/images/lin_apparel_2.png']
     },
     social: {
-      strategyLogs: [
-        '商品メタデータ "LIN Minimal Apparel" の解析完了。',
-        'コアバリューを「エフォートレスな美学」「サステナブルかつ普遍的」に設定。',
-        '競合アパレルブランド（Lemaire, Margaret Howell）のSNSコンテンツ分析。',
-        '主要ターゲット層：丁寧な暮らしを好む20代後半〜40代、クリエイター、ミニマリスト。',
-        '今週の投稿戦略カレンダー（7枠）を作成しました。配信を開始します。'
-      ],
       posts: [
         { id: 'p1', time: 'Mon 10:00', theme: 'リネン素材の持つ独自の呼吸', image: '/images/lin_apparel_1.png', caption: '丁寧に手摘みされた天然リネン。自然なシワと、空気を含むような軽やかさが、日々の装いに上質な心地よさを与えます。LINが追求する、エフォートレスな美学。', hashtags: ['linapparel', 'linenwear', 'slowfashion', 'genderless'], likes: 0, comments: 0, shares: 0, status: 'pending' },
         { id: 'p2', time: 'Tue 19:00', theme: 'ギャラリーに溶け込むシルエット', image: '/images/lin_apparel_2.png', caption: '直線の美しさと、身体の動きに寄り添うドレープ。過剰な装飾をすべて取り払い、まとう人の個性を引き立てるライトベージュのウールコート。', hashtags: ['minimalism', 'fashionpost', 'gallerylook', 'sustainablefashion'], likes: 0, comments: 0, shares: 0, status: 'pending' },
@@ -289,13 +292,6 @@ const INITIAL_PRESETS: Scenario[] = [
     },
     ads: {
       connections: { Meta: true, Google: false, TikTok: true },
-      strategyLogs: [
-        '配信アカウント「LIN Official Store」の接続を確認。',
-        'ターゲットセグメント：サステナブルアパレル、ミニマリズム、デザイナーズブランド関心層。',
-        '広告アセットの自動生成を開始：Meta / TikTok向け縦型リール素材 3パターン。',
-        '目標ROASを設定: 310% / 目標CPA 3,200円。',
-        'スマートクリエイティブ入札をオンにしました。Meta & TikTokへ一括送信します。'
-      ],
       campaigns: [
         { id: 'c1', name: 'LIN_Minimalism_Concept_Meta', platform: 'Meta', budget: '¥6,000 / 日', status: 'pending', image: '/images/lin_apparel_1.png', cpc: 0, cpa: 0, roas: 0 },
         { id: 'c2', name: 'LIN_Linen_Nature_TikTok', platform: 'TikTok', budget: '¥5,000 / 日', status: 'pending', image: '/images/lin_apparel_1.png', cpc: 0, cpa: 0, roas: 0 },
@@ -347,37 +343,189 @@ const INITIAL_PRESETS: Scenario[] = [
   }
 ];
 
-// Helper to resolve duration with random jitter
-function resolveStepDuration(baseMs: number, speed: number, jitterPct: number): number {
-  const jitterVal = (Math.random() * 2 - 1) * (jitterPct / 100); // e.g. ±20% -> -0.2 to +0.2
-  return Math.max(500, (baseMs * (1 + jitterVal)) / speed);
+// Helper to generate discrete event queue for Social
+function getSocialEvents(scenario: Scenario): DemoEvent[] {
+  const p = scenario.social.posts;
+  const m = scenario.social.metrics;
+  const sName = scenario.product.name;
+  return [
+    { type: 'log', text: 'cat brand_strategy_config.json', logType: 'cmd', delay: 800 },
+    { type: 'log', text: `↳ Loaded target brand: "${sName}"`, logType: 'info', delay: 400 },
+    { type: 'task_start', taskId: 't1', delay: 300 },
+    { type: 'log', text: 'Scanning competitor channel profiles...', logType: 'info', delay: 1200 },
+    { type: 'log', text: '↳ Extracted design vectors and visual style prompts.', logType: 'info', delay: 600 },
+    { type: 'log', text: 'Mapping demographics: minimalist enthusiasts & design-centric personas...', logType: 'info', delay: 1400 },
+    { type: 'log', text: '✓ 3 target audience segments successfully identified (1.2s)', logType: 'success', delay: 800 },
+    { type: 'log', text: 'Structuring weekly post themes and release pacing schedule...', logType: 'info', delay: 1000 },
+    { type: 'log', text: '✓ Weekly Content Strategy locked (7 slots created)', logType: 'success', delay: 1100 },
+    { type: 'task_done', taskId: 't1', elapsedSec: 6.1, delay: 500 },
+    
+    { type: 'task_start', taskId: 't2', delay: 400 },
+    { type: 'log', text: 'generate_post_creatives --engine=coreberg-vision-v3', logType: 'cmd', delay: 700 },
+    { type: 'post_status', postId: p[0].id, status: 'generating', delay: 400 },
+    { type: 'post_status', postId: p[1].id, status: 'generating', delay: 500 },
+    { type: 'post_status', postId: p[0].id, status: 'ready', delay: 1800 },
+    { type: 'post_status', postId: p[2].id, status: 'generating', delay: 400 },
+    { type: 'post_status', postId: p[1].id, status: 'ready', delay: 1600 },
+    { type: 'log', text: 'Warning: Meta Graph API response latency high (3400ms)', logType: 'warn', delay: 900 },
+    { type: 'log', text: '↳ Rerouting through Tokyo-Edge backup gateway...', logType: 'info', delay: 700 },
+    { type: 'log', text: '✓ Edge node connection recovered. Continuing generation.', logType: 'success', delay: 1500 },
+    { type: 'post_status', postId: p[3].id, status: 'generating', delay: 300 },
+    { type: 'post_status', postId: p[2].id, status: 'ready', delay: 1400 },
+    { type: 'post_status', postId: p[4].id, status: 'generating', delay: 350 },
+    { type: 'post_status', postId: p[3].id, status: 'ready', delay: 1200 },
+    { type: 'post_status', postId: p[5].id, status: 'generating', delay: 300 },
+    { type: 'post_status', postId: p[4].id, status: 'ready', delay: 1500 },
+    { type: 'post_status', postId: p[6].id, status: 'generating', delay: 400 },
+    { type: 'post_status', postId: p[5].id, status: 'ready', delay: 1600 },
+    { type: 'post_status', postId: p[6].id, status: 'ready', delay: 1300 },
+    { type: 'log', text: '✓ 7 weekly posts (image assets & structured text) finalized.', logType: 'success', delay: 900 },
+    { type: 'task_done', taskId: 't2', elapsedSec: 15.6, delay: 500 },
+    
+    { type: 'task_start', taskId: 't3', delay: 400 },
+    { type: 'log', text: 'publish_scheduler --queue=instagram_official', logType: 'cmd', delay: 700 },
+    { type: 'post_status', postId: p[0].id, status: 'published', delay: 700 },
+    { type: 'post_status', postId: p[1].id, status: 'published', delay: 800 },
+    { type: 'post_status', postId: p[2].id, status: 'published', delay: 600 },
+    { type: 'post_status', postId: p[3].id, status: 'published', delay: 800 },
+    { type: 'post_status', postId: p[4].id, status: 'published', delay: 700 },
+    { type: 'post_status', postId: p[5].id, status: 'published', delay: 700 },
+    { type: 'post_status', postId: p[6].id, status: 'published', delay: 800 },
+    { type: 'log', text: '✓ Dispatch successful. 7 items registered to Cron Schedule.', logType: 'success', delay: 1000 },
+    { type: 'task_done', taskId: 't3', elapsedSec: 5.7, delay: 500 },
+    
+    { type: 'task_start', taskId: 't4', delay: 400 },
+    { type: 'log', text: 'fetch_realtime_metrics --interval=7d', logType: 'cmd', delay: 600 },
+    { type: 'log', text: '↳ Retrieving comments, shares, likes, and save ratios...', logType: 'info', delay: 900 },
+    { type: 'social_metric', reach: m.reachRatio * 0.4, save: m.saveRatio * 0.3, engagement: m.engagementRatio * 0.3, saveRate: m.saveRateFrom + (m.saveRateTo-m.saveRateFrom)*0.2, delay: 1000 },
+    { type: 'social_metric', reach: m.reachRatio * 0.7, save: m.saveRatio * 0.6, engagement: m.engagementRatio * 0.6, saveRate: m.saveRateFrom + (m.saveRateTo-m.saveRateFrom)*0.6, delay: 1200 },
+    { type: 'social_metric', reach: m.reachRatio, save: m.saveRatio, engagement: m.engagementRatio, saveRate: m.saveRateTo, delay: 1500 },
+    { type: 'log', text: `✓ Insight: Material-focused closeups show +${Math.round(m.saveRatio * 100)}% save rate.`, logType: 'success', delay: 1100 },
+    { type: 'log', text: 'Feedback optimization seeds updated for next cycle strategy planning.', logType: 'info', delay: 1800 },
+    { type: 'task_done', taskId: 't4', elapsedSec: 8.6, delay: 1000 }
+  ];
 }
 
-// Scenarios step metrics calculation
-// 1. Social steps configuration
-const SOCIAL_STEP_DEFAULTS = [
-  { label: 'Strategy Planning', baseMs: 8000 },
-  { label: 'Creative Content Generation', baseMs: 12000 },
-  { label: 'Schedule & Publish', baseMs: 6000 },
-  { label: 'Optimize & Loop Feedbacks', baseMs: 8000 }
-];
+// Helper to generate discrete event queue for Ads
+function getAdsEvents(scenario: Scenario): DemoEvent[] {
+  const c = scenario.ads.campaigns;
+  const m = scenario.ads.metrics;
+  return [
+    { type: 'log', text: 'ads_optimizer --connect=meta,google_ads --dry-run=false', logType: 'cmd', delay: 900 },
+    { type: 'task_start', taskId: 'a1', delay: 300 },
+    { type: 'log', text: 'Establishing handshake with Google Ads MCC accounts...', logType: 'info', delay: 1100 },
+    { type: 'log', text: 'Establishing handshake with Meta Business Manager...', logType: 'info', delay: 900 },
+    { type: 'log', text: '↳ Extracting demographic bid multipliers...', logType: 'info', delay: 1300 },
+    { type: 'log', text: '✓ Target segmentation index built.', logType: 'success', delay: 1000 },
+    { type: 'task_done', taskId: 'a1', elapsedSec: 4.5, delay: 500 },
+    
+    { type: 'task_start', taskId: 'a2', delay: 400 },
+    { type: 'log', text: 'generate_ad_variants --budget_cap=auto', logType: 'cmd', delay: 700 },
+    { type: 'campaign_status', campaignId: c[0].id, status: 'generating', delay: 400 },
+    { type: 'campaign_status', campaignId: c[1].id, status: 'generating', delay: 500 },
+    { type: 'campaign_status', campaignId: c[0].id, status: 'ready', delay: 1800 },
+    { type: 'campaign_status', campaignId: c[2].id, status: 'generating', delay: 400 },
+    { type: 'campaign_status', campaignId: c[1].id, status: 'ready', delay: 1600 },
+    { type: 'campaign_status', campaignId: c[2].id, status: 'ready', delay: 1400 },
+    { type: 'log', text: '✓ 3 smart campaigns generated (Meta Concept, Google Tech, Meta Lifestyle).', logType: 'success', delay: 900 },
+    { type: 'task_done', taskId: 'a2', elapsedSec: 7.7, delay: 500 },
+    
+    { type: 'task_start', taskId: 'a3', delay: 400 },
+    { type: 'log', text: 'deploy_campaigns --dest=apis --audit=strict', logType: 'cmd', delay: 700 },
+    { type: 'log', text: 'Pushing Google Ads campaigns to P-MAX endpoints...', logType: 'info', delay: 1200 },
+    { type: 'log', text: 'Pushing Meta Concept ads...', logType: 'info', delay: 900 },
+    { type: 'log', text: 'Warning: Meta Ads API request limit exceeded (429)', logType: 'warn', delay: 1000 },
+    { type: 'log', text: '↳ Rate limiter triggered. Backing off for 3.5s...', logType: 'info', delay: 800 },
+    { type: 'log', text: '↳ Retrying Meta Lifestyle ads submission...', logType: 'info', delay: 3500 },
+    { type: 'log', text: '✓ Meta rate limits cleared. Resuming submission.', logType: 'success', delay: 1200 },
+    { type: 'campaign_status', campaignId: c[0].id, status: 'active', delay: 600 },
+    { type: 'campaign_status', campaignId: c[1].id, status: 'active', delay: 700 },
+    { type: 'campaign_status', campaignId: c[2].id, status: 'active', delay: 500 },
+    { type: 'log', text: '✓ Deployed. 3 campaign sets passed creative review & running.', logType: 'success', delay: 1000 },
+    { type: 'task_done', taskId: 'a3', elapsedSec: 10.9, delay: 500 },
+    
+    { type: 'task_start', taskId: 'a4', delay: 400 },
+    { type: 'log', text: 'monitor_roas --optimize=auto', logType: 'cmd', delay: 600 },
+    { type: 'log', text: '↳ Accumulating CPC and conversion logs...', logType: 'info', delay: 900 },
+    { type: 'ads_metric', sales: m.salesFrom + (m.salesTo-m.salesFrom)*0.3, cpa: m.cpaFrom - (m.cpaFrom-m.cpaTo)*0.2, roas: m.roasFrom + (m.roasTo-m.roasFrom)*0.2, spend: (m.salesFrom + (m.salesTo-m.salesFrom)*0.3) / (m.roasFrom + (m.roasTo-m.roasFrom)*0.2), delay: 1200 },
+    { type: 'log', text: '↳ Optimizing Meta bids: Decreasing target CPC by 12%', logType: 'info', delay: 1400 },
+    { type: 'ads_metric', sales: m.salesFrom + (m.salesTo-m.salesFrom)*0.7, cpa: m.cpaFrom - (m.cpaFrom-m.cpaTo)*0.6, roas: m.roasFrom + (m.roasTo-m.roasFrom)*0.6, spend: (m.salesFrom + (m.salesTo-m.salesFrom)*0.7) / (m.roasFrom + (m.roasTo-m.roasFrom)*0.6), delay: 1200 },
+    { type: 'log', text: '↳ Optimizing Google P-MAX: Shift 18% budget to Concept ad asset', logType: 'info', delay: 1300 },
+    { type: 'ads_metric', sales: m.salesTo, cpa: m.cpaTo, roas: m.roasTo, spend: m.salesTo / m.roasTo, delay: 1500 },
+    { type: 'log', text: `✓ Target ROAS achieved: ${m.roasTo}x (CPA: JPY ${m.cpaTo})`, logType: 'success', delay: 1100 },
+    { type: 'task_done', taskId: 'a4', elapsedSec: 9.3, delay: 1000 }
+  ];
+}
 
-// 2. Ads steps configuration
-const ADS_STEP_DEFAULTS = [
-  { label: 'Strategy & Segmentation', baseMs: 9000 },
-  { label: 'Creative Generation', baseMs: 11000 },
-  { label: 'Ad Campaign Deployment', baseMs: 7000 },
-  { label: 'Dashboard & CPA Optimization', baseMs: 8000 }
-];
+// Helper to generate discrete event queue for LLMO
+function getLlmoEvents(scenario: Scenario): DemoEvent[] {
+  const scores = scenario.llmo.visibilityScores;
+  const queries = scenario.llmo.queries;
+  const actions = scenario.llmo.actions;
+  return [
+    { type: 'log', text: 'llm_visibility_audit --keywords=auto', logType: 'cmd', delay: 800 },
+    { type: 'task_start', taskId: 'l1', delay: 300 },
+    { type: 'log', text: 'Crawling API endpoints for ChatGPT (GPT-5.5)...', logType: 'info', delay: 1200 },
+    { type: 'log', text: 'Crawling Gemini (Gemini 3.5 Flash)...', logType: 'info', delay: 900 },
+    { type: 'log', text: 'Crawling Claude (Claude Opus 4.8)...', logType: 'info', delay: 1000 },
+    { type: 'log', text: 'Crawling Perplexity router endpoints...', logType: 'info', delay: 1100 },
+    { type: 'llmo_score', model: scores[0].model, score: scores[0].score, delay: 200 },
+    { type: 'llmo_score', model: scores[1].model, score: scores[1].score, delay: 200 },
+    { type: 'llmo_score', model: scores[2].model, score: scores[2].score, delay: 200 },
+    { type: 'llmo_score', model: scores[3].model, score: scores[3].score, delay: 200 },
+    { type: 'llmo_query', queryIndex: 0, appeared: 'no', delay: 300 },
+    { type: 'llmo_query', queryIndex: 1, appeared: 'partial', delay: 300 },
+    { type: 'llmo_query', queryIndex: 2, appeared: 'no', delay: 300 },
+    { type: 'log', text: '✓ Brand audit metrics indexed.', logType: 'success', delay: 900 },
+    { type: 'task_done', taskId: 'l1', elapsedSec: 7.6, delay: 500 },
+    
+    { type: 'task_start', taskId: 'l2', delay: 400 },
+    { type: 'log', text: 'optimize_entities --pipeline=semantic-weighting', logType: 'cmd', delay: 700 },
+    
+    { type: 'llmo_action', actionId: actions[0].id, status: 'running', delay: 400 },
+    { type: 'log', text: `Optimizing schema payload: "${actions[0].label}"`, logType: 'info', delay: 1000 },
+    { type: 'llmo_action', actionId: actions[0].id, status: 'completed', delay: 800 },
+    { type: 'llmo_score', model: scores[0].model, score: scores[0].score + 8, delay: 200 },
+    { type: 'llmo_score', model: scores[2].model, score: scores[2].score + 10, delay: 200 },
+    
+    { type: 'llmo_action', actionId: actions[1].id, status: 'running', delay: 400 },
+    { type: 'log', text: `Indexing PR reviews: "${actions[1].label}"`, logType: 'info', delay: 1200 },
+    { type: 'llmo_action', actionId: actions[1].id, status: 'completed', delay: 600 },
+    { type: 'llmo_score', model: scores[1].model, score: scores[1].score + 10, delay: 200 },
+    { type: 'llmo_score', model: scores[3].model, score: scores[3].score + 12, delay: 200 },
 
-// 3. LLMO steps configuration
-const LLMO_STEP_DEFAULTS = [
-  { label: 'AI Visibility Audit', baseMs: 7000 },
-  { label: 'Entity & Content Optimization', baseMs: 12000 },
-  { label: 'Citations Update', baseMs: 7000 }
-];
+    { type: 'llmo_action', actionId: actions[2].id, status: 'running', delay: 400 },
+    { type: 'log', text: `Adjusting natural language metadata: "${actions[2].label}"`, logType: 'info', delay: 1100 },
+    { type: 'llmo_action', actionId: actions[2].id, status: 'completed', delay: 800 },
 
-// Load localStorage helper if client-side
+    { type: 'llmo_action', actionId: actions[3].id, status: 'running', delay: 400 },
+    { type: 'llmo_action', actionId: actions[3].id, status: 'completed', delay: 1400 },
+    
+    { type: 'llmo_action', actionId: actions[4].id, status: 'running', delay: 400 },
+    { type: 'llmo_action', actionId: actions[4].id, status: 'completed', delay: 1500 },
+    
+    { type: 'log', text: '✓ 5 entity structure adjustments deployed to PR schema index.', logType: 'success', delay: 900 },
+    { type: 'task_done', taskId: 'l2', elapsedSec: 12.3, delay: 500 },
+    
+    { type: 'task_start', taskId: 'l3', delay: 400 },
+    { type: 'log', text: 'verify_llm_citations --mode=strict', logType: 'cmd', delay: 700 },
+    { type: 'log', text: 'Requesting live content generation check from endpoints...', logType: 'info', delay: 1200 },
+    
+    { type: 'llmo_query', queryIndex: 0, appeared: 'yes', delay: 600 },
+    { type: 'llmo_score', model: scores[0].model, score: scores[0].score + 35, delay: 200 },
+    { type: 'llmo_score', model: scores[1].model, score: scores[1].score + 35, delay: 200 },
+    
+    { type: 'llmo_query', queryIndex: 1, appeared: 'yes', delay: 800 },
+    { type: 'llmo_score', model: scores[2].model, score: scores[2].score + 35, delay: 200 },
+    
+    { type: 'llmo_query', queryIndex: 2, appeared: 'yes', delay: 800 },
+    { type: 'llmo_score', model: scores[3].model, score: scores[3].score + 35, delay: 200 },
+
+    { type: 'log', text: '✓ All major citations and recommendations verified.', logType: 'success', delay: 1000 },
+    { type: 'task_done', taskId: 'l3', elapsedSec: 6.9, delay: 1000 }
+  ];
+}
+
 const loadFromStorage = <T>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -397,6 +545,15 @@ const saveToStorage = <T>(key: string, value: T): void => {
   }
 };
 
+// Helper for initial state creation
+const createInitialAgentState = (tasks: TaskItem[]): AgentState => ({
+  logs: [],
+  tasks: tasks.map(t => ({ ...t, status: 'pending' })),
+  eventIndex: 0,
+  timer: 500, // initial delay before starting
+  status: 'idle'
+});
+
 export const useDemoStore = create<DemoState>((set, get) => ({
   // Scenarios list & active
   scenarios: loadFromStorage<Scenario[]>('coreberg_scenarios', INITIAL_PRESETS),
@@ -412,35 +569,37 @@ export const useDemoStore = create<DemoState>((set, get) => ({
   // Engine States
   orchestratorProgress: 0,
   
-  // Social
-  socialStepIndex: 0,
-  socialStepProgress: 0,
-  socialStepDuration: 8000,
-  socialStrategyLogsVisible: [],
+  // Agent States
+  socialState: createInitialAgentState([
+    { id: 't1', label: 'ブランド分析・企画立案' },
+    { id: 't2', label: 'クリエイティブ・コンテンツ生成' },
+    { id: 't3', label: '予約投稿スケジュール' },
+    { id: 't4', label: '効果測定・改善フィードバック' }
+  ] as TaskItem[]),
   socialPosts: [],
   socialMetrics: { reach: 1.0, save: 1.0, engagement: 1.0, saveRate: 0.35 },
 
-  // Ads
-  adsStepIndex: 0,
-  adsStepProgress: 0,
-  adsStepDuration: 9000,
-  adsStrategyLogsVisible: [],
+  adsState: createInitialAgentState([
+    { id: 'a1', label: '広告戦略・セグメンテーション' },
+    { id: 'a2', label: 'クリエイティブバリエーション作成' },
+    { id: 'a3', label: 'Meta & Google API出稿' },
+    { id: 'a4', label: '最適化ダッシュボード反映' }
+  ] as TaskItem[]),
   adsCampaigns: [],
   adsMetrics: { sales: 0, cpa: 0, roas: 0, spend: 0 },
 
-  // LLMO
-  llmoStepIndex: 0,
-  llmoStepProgress: 0,
-  llmoStepDuration: 7000,
+  llmoState: createInitialAgentState([
+    { id: 'l1', label: '主要LLM露出度監査' },
+    { id: 'l2', label: 'セマンティック最適化アクション' },
+    { id: 'l3', label: '推奨引用インデックス更新' }
+  ] as TaskItem[]),
   llmoScores: {},
-  llmoActions: [],
   llmoQueries: [],
+  llmoActions: [],
 
   // Methods
   startDemo: () => {
     set({ isPlaying: true });
-    
-    // If resetting from completed, restart
     const state = get();
     if (state.orchestratorProgress >= 100) {
       get().resetDemo();
@@ -456,96 +615,89 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     const state = get();
     const scenario = state.scenarios.find(s => s.id === state.activeScenarioId) || state.scenarios[0];
     
-    // Calculate first step durations
-    const speed = state.playbackSpeed;
-    const jitter = state.jitterPct;
-    
-    const socialDur = resolveStepDuration(SOCIAL_STEP_DEFAULTS[0].baseMs, speed, jitter);
-    const adsDur = resolveStepDuration(ADS_STEP_DEFAULTS[0].baseMs, speed, jitter);
-    const llmoDur = resolveStepDuration(LLMO_STEP_DEFAULTS[0].baseMs, speed, jitter);
-
     // Initial scores for LLMO
     const initialScores: { [model: string]: number } = {};
     scenario.llmo.visibilityScores.forEach(s => {
-      initialScores[s.model] = s.score; // start with baseline
+      initialScores[s.model] = s.score;
     });
 
     set({
       isPlaying: false,
       orchestratorProgress: 0,
       
-      // Social
-      socialStepIndex: 0,
-      socialStepProgress: 0,
-      socialStepDuration: socialDur,
-      socialStrategyLogsVisible: [],
+      // Social Reset
+      socialState: createInitialAgentState([
+        { id: 't1', label: 'ブランド分析・企画立案' },
+        { id: 't2', label: 'クリエイティブ・コンテンツ生成' },
+        { id: 't3', label: '予約投稿スケジュール' },
+        { id: 't4', label: '効果測定・改善フィードバック' }
+      ] as TaskItem[]),
       socialPosts: scenario.social.posts.map(p => ({ ...p, status: 'pending', likes: 0, comments: 0, shares: 0 })),
       socialMetrics: { reach: 1.0, save: 1.0, engagement: 1.0, saveRate: scenario.social.metrics.saveRateFrom },
 
-      // Ads
-      adsStepIndex: 0,
-      adsStepProgress: 0,
-      adsStepDuration: adsDur,
-      adsStrategyLogsVisible: [],
+      // Ads Reset
+      adsState: createInitialAgentState([
+        { id: 'a1', label: '広告戦略・セグメンテーション' },
+        { id: 'a2', label: 'クリエイティブバリエーション作成' },
+        { id: 'a3', label: 'Meta & Google API出稿' },
+        { id: 'a4', label: '最適化ダッシュボード反映' }
+      ] as TaskItem[]),
       adsCampaigns: scenario.ads.campaigns.map(c => ({ ...c, status: 'pending', cpc: 0, cpa: 0, roas: 0 })),
       adsMetrics: { sales: 0, cpa: scenario.ads.metrics.cpaFrom, roas: scenario.ads.metrics.roasFrom, spend: 0 },
 
-      // LLMO
-      llmoStepIndex: 0,
-      llmoStepProgress: 0,
-      llmoStepDuration: llmoDur,
+      // LLMO Reset
+      llmoState: createInitialAgentState([
+        { id: 'l1', label: '主要LLM露出度監査' },
+        { id: 'l2', label: 'セマンティック最適化アクション' },
+        { id: 'l3', label: '推奨引用インデックス更新' }
+      ] as TaskItem[]),
       llmoScores: initialScores,
-      llmoActions: scenario.llmo.actions.map(a => ({ ...a, status: 'pending' })),
       llmoQueries: scenario.llmo.queries.map(q => ({ ...q, appeared: 'no' })),
+      llmoActions: scenario.llmo.actions.map(a => ({ ...a, status: 'pending' })),
     });
   },
 
-  stepForward: () => {
-    // Force step forward on active or all agents manually (for custom shortcuts)
+  stepForward: (agent) => {
+    // Force executing the next event for the specific agent instantly
     const state = get();
-    
-    // Simple incremental step for social, ads, and llmo
-    const nextSocialIndex = (state.socialStepIndex + 1) % 4;
-    const nextAdsIndex = (state.adsStepIndex + 1) % 4;
-    const nextLlmoIndex = (state.llmoStepIndex + 1) % 3;
-
     const scenario = state.scenarios.find(s => s.id === state.activeScenarioId) || state.scenarios[0];
-    const speed = state.playbackSpeed;
-    const jitter = state.jitterPct;
+    
+    let events: DemoEvent[] = [];
+    let agentState: AgentState;
+    if (agent === 'social') {
+      events = getSocialEvents(scenario);
+      agentState = state.socialState;
+    } else if (agent === 'ads') {
+      events = getAdsEvents(scenario);
+      agentState = state.adsState;
+    } else {
+      events = getLlmoEvents(scenario);
+      agentState = state.llmoState;
+    }
 
-    // Advance steps
-    set({
-      socialStepIndex: nextSocialIndex,
-      socialStepProgress: 0,
-      socialStepDuration: resolveStepDuration(SOCIAL_STEP_DEFAULTS[nextSocialIndex].baseMs, speed, jitter),
-      
-      adsStepIndex: nextAdsIndex,
-      adsStepProgress: 0,
-      adsStepDuration: resolveStepDuration(ADS_STEP_DEFAULTS[nextAdsIndex].baseMs, speed, jitter),
-      
-      llmoStepIndex: nextLlmoIndex,
-      llmoStepProgress: 0,
-      llmoStepDuration: resolveStepDuration(LLMO_STEP_DEFAULTS[nextLlmoIndex].baseMs, speed, jitter),
-    });
+    if (agentState.eventIndex < events.length) {
+      // Trigger execution of this single event
+      const event = events[agentState.eventIndex];
+      // Tick once setting timer to 0 and forcing run
+      set((s) => {
+        const targetState = agent === 'social' 
+          ? { ...s.socialState, timer: 0 } 
+          : agent === 'ads' 
+            ? { ...s.adsState, timer: 0 } 
+            : { ...s.llmoState, timer: 0 };
 
-    // Helper functions can run on index updates
-    // (Ensure logs / data fill instantly for previous steps)
-    if (nextSocialIndex === 0) {
-      // Wrap loop / reset metrics
-      get().resetDemo();
+        return agent === 'social' 
+          ? { socialState: targetState } 
+          : agent === 'ads' 
+            ? { adsState: targetState } 
+            : { llmoState: targetState };
+      });
     }
   },
 
   setSpeed: (speed) => {
     set({ playbackSpeed: speed });
     saveToStorage('coreberg_speed', speed);
-    // Recalculate remaining duration for current steps based on new speed
-    const state = get();
-    set({
-      socialStepDuration: (state.socialStepDuration * state.playbackSpeed) / speed,
-      adsStepDuration: (state.adsStepDuration * state.playbackSpeed) / speed,
-      llmoStepDuration: (state.llmoStepDuration * state.playbackSpeed) / speed,
-    });
   },
 
   setScenario: (id) => {
@@ -582,7 +734,9 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     saveToStorage('coreberg_jitter', pct);
   },
 
-  // The engine tick loop (called from frontend hook)
+  // ----------------------------------------------------
+  // ASYNC EVENT-QUEUE CLOCK ENGINE
+  // ----------------------------------------------------
   tick: (dtMs) => {
     const state = get();
     if (!state.isPlaying) return;
@@ -591,312 +745,182 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     const speed = state.playbackSpeed;
     const jitter = state.jitterPct;
 
-    // 1. Update Global Orchestrator Progress
-    // We base Orchestrator Progress on the average progress of the three agents
-    const averageStepPercentage = (
-      ((state.socialStepIndex * 100 + state.socialStepProgress) / 400) +
-      ((state.adsStepIndex * 100 + state.adsStepProgress) / 400) +
-      ((state.llmoStepIndex * 100 + state.llmoStepProgress) / 300)
-    ) / 3 * 100;
+    // We process each agent asynchronously
+    const processAgentUpdate = (
+      agentKey: 'social' | 'ads' | 'llmo',
+      currentAgentState: AgentState,
+      events: DemoEvent[]
+    ) => {
+      let timer = currentAgentState.timer - dtMs * speed;
+      let eventIndex = currentAgentState.eventIndex;
+      let status = currentAgentState.status;
+      let logs = [...currentAgentState.logs];
+      let tasks = [...currentAgentState.tasks];
 
-    set({ orchestratorProgress: Math.min(100, Math.round(averageStepPercentage)) });
+      if (eventIndex >= events.length) {
+        // Queue finished
+        status = 'completed';
+        if (state.isLoop && agentKey === 'social') {
+          // If loop is on, let the social agent reset the overall flow
+          // when it reaches the end, creating a clean circular timeline.
+          // This keeps the presentation continuous.
+          setTimeout(() => {
+            get().resetDemo();
+            get().startDemo();
+          }, 3000);
+        }
+        return { timer: 1000, eventIndex, status, logs, tasks };
+      }
 
-    // ----------------------------------------------------
-    // SOCIAL AGENT ENGINE
-    // ----------------------------------------------------
-    let newSocialProgress = state.socialStepProgress + (dtMs / state.socialStepDuration) * 100;
-    let newSocialStepIndex = state.socialStepIndex;
-    let newSocialStepDuration = state.socialStepDuration;
+      status = 'running';
 
-    if (newSocialProgress >= 100) {
-      if (state.socialStepIndex < 3) {
-        newSocialStepIndex += 1;
-        newSocialProgress = 0;
-        newSocialStepDuration = resolveStepDuration(SOCIAL_STEP_DEFAULTS[newSocialStepIndex].baseMs, speed, jitter);
-      } else {
-        // Step 3 (Optimize) finished
-        if (state.isLoop) {
-          // Restart loop
-          newSocialStepIndex = 0;
-          newSocialProgress = 0;
-          newSocialStepDuration = resolveStepDuration(SOCIAL_STEP_DEFAULTS[0].baseMs, speed, jitter);
+      // Keep de-queuing events as long as the timer is <= 0
+      while (timer <= 0 && eventIndex < events.length) {
+        const event = events[eventIndex];
+        
+        // Execute Event Side-Effects
+        switch (event.type) {
+          case 'log': {
+            const timeStr = new Date().toTimeString().split(' ')[0];
+            const newLine: LogLine = {
+              id: `${agentKey}_log_${eventIndex}_${Date.now()}`,
+              text: event.text,
+              type: event.logType,
+              timestamp: `[${timeStr}]`
+            };
+            logs.push(newLine);
+            break;
+          }
+          case 'task_start': {
+            tasks = tasks.map(t => t.id === event.taskId ? { ...t, status: 'running' } : t);
+            break;
+          }
+          case 'task_done': {
+            tasks = tasks.map(t => t.id === event.taskId ? { 
+              ...t, 
+              status: 'completed', 
+              elapsed: `${event.elapsedSec.toFixed(1)}s` 
+            } : t);
+            break;
+          }
+          case 'post_status': {
+            set((prev) => {
+              const updatedPosts = prev.socialPosts.map(p => 
+                p.id === event.postId 
+                  ? { 
+                      ...p, 
+                      status: event.status,
+                      // Auto-populate metrics on publish
+                      likes: event.status === 'published' ? 250 : p.likes,
+                      shares: event.status === 'published' ? 12 : p.shares
+                    } 
+                  : p
+              );
+              return { socialPosts: updatedPosts };
+            });
+            break;
+          }
+          case 'campaign_status': {
+            set((prev) => {
+              const updatedCampaigns = prev.adsCampaigns.map(c => 
+                c.id === event.campaignId 
+                  ? { 
+                      ...c, 
+                      status: event.status,
+                      cpc: event.status === 'active' ? 95 : c.cpc,
+                      cpa: event.status === 'active' ? 4800 : c.cpa,
+                      roas: event.status === 'active' ? 2.1 : c.roas
+                    } 
+                  : c
+              );
+              return { adsCampaigns: updatedCampaigns };
+            });
+            break;
+          }
+          case 'llmo_score': {
+            set((prev) => {
+              const scores = { ...prev.llmoScores, [event.model]: event.score };
+              return { llmoScores: scores };
+            });
+            break;
+          }
+          case 'llmo_query': {
+            set((prev) => {
+              const queries = prev.llmoQueries.map((q, idx) => 
+                idx === event.queryIndex ? { ...q, appeared: event.appeared } : q
+              );
+              return { llmoQueries: queries };
+            });
+            break;
+          }
+          case 'llmo_action': {
+            set((prev) => {
+              const updatedActions = prev.llmoActions.map(a => 
+                a.id === event.actionId ? { ...a, status: event.status } : a
+              );
+              const updatedTasks = prev.llmoState.tasks.map((t, idx) => {
+                if (idx === 1) { // Action tab is step 2
+                  return { ...t, status: event.status };
+                }
+                return t;
+              });
+              return {
+                llmoActions: updatedActions,
+                llmoState: {
+                  ...prev.llmoState,
+                  tasks: updatedTasks
+                }
+              };
+            });
+            break;
+          }
+          case 'social_metric': {
+            set({ socialMetrics: { reach: event.reach, save: event.save, engagement: event.engagement, saveRate: event.saveRate } });
+            break;
+          }
+          case 'ads_metric': {
+            set({ adsMetrics: { sales: event.sales, cpa: event.cpa, roas: event.roas, spend: event.spend } });
+            break;
+          }
+        }
+
+        // Advance index
+        eventIndex++;
+
+        // Read the next event delay to set timer
+        if (eventIndex < events.length) {
+          const nextEvent = events[eventIndex];
+          // Apply random jitter factor
+          const jitterMultiplier = 1 + (Math.random() * 2 - 1) * (jitter / 100);
+          timer = nextEvent.delay * jitterMultiplier;
         } else {
-          newSocialProgress = 100;
+          timer = 1000;
         }
       }
-    }
 
-    // Process details inside Social steps
-    let newSocialLogsVisible = [...state.socialStrategyLogsVisible];
-    let newSocialPosts = [...state.socialPosts];
-    let newSocialMetrics = { ...state.socialMetrics };
+      return { timer, eventIndex, status, logs, tasks };
+    };
 
-    if (newSocialStepIndex === 0) {
-      // Step 0: Strategy (1 line of log added sequentially based on progress)
-      const logLinesCount = scenario.social.strategyLogs.length;
-      const visibleCount = Math.min(
-        logLinesCount,
-        Math.floor((newSocialProgress / 100) * (logLinesCount + 1))
-      );
-      newSocialLogsVisible = scenario.social.strategyLogs.slice(0, visibleCount);
-      
-      // Reset posts & metrics
-      newSocialPosts = scenario.social.posts.map(p => ({ ...p, status: 'pending', likes: 0, comments: 0, shares: 0 }));
-      newSocialMetrics = { reach: 1.0, save: 1.0, engagement: 1.0, saveRate: scenario.social.metrics.saveRateFrom };
-    } 
-    else if (newSocialStepIndex === 1) {
-      // Step 1: Creative (posts statuses transit from pending -> generating -> ready)
-      // Set logs to complete
-      newSocialLogsVisible = scenario.social.strategyLogs;
-      
-      const totalPosts = newSocialPosts.length;
-      // We shuffle or sequentially make posts ready
-      newSocialPosts = newSocialPosts.map((p, idx) => {
-        // Randomize ready states based on progress and post index
-        const triggerReady = (newSocialProgress / 100) * totalPosts;
-        if (triggerReady > idx + 0.5) {
-          return { ...p, status: 'ready' as const };
-        } else if (triggerReady > idx) {
-          return { ...p, status: 'generating' as const };
-        } else {
-          return { ...p, status: 'pending' as const };
-        }
-      });
-    }
-    else if (newSocialStepIndex === 2) {
-      // Step 2: Publish (posts transit from ready -> published)
-      newSocialPosts = newSocialPosts.map(p => ({ ...p, status: 'ready' })); // ensure all ready
-      const totalPosts = newSocialPosts.length;
-      newSocialPosts = newSocialPosts.map((p, idx) => {
-        const triggerPublish = (newSocialProgress / 100) * totalPosts;
-        if (triggerPublish > idx) {
-          return { ...p, status: 'published' as const };
-        }
-        return p;
-      });
-    }
-    else if (newSocialStepIndex === 3) {
-      // Step 3: Optimize (Published posts gain likes/KPIs count up)
-      newSocialPosts = newSocialPosts.map(p => ({ ...p, status: 'published' })); // ensure published
-      
-      const progressFactor = newSocialProgress / 100;
-      
-      // Interpolate metrics
-      const reach = 1.0 + (scenario.social.metrics.reachRatio - 1.0) * progressFactor;
-      const save = 1.0 + (scenario.social.metrics.saveRatio - 1.0) * progressFactor;
-      const engagement = 1.0 + (scenario.social.metrics.engagementRatio - 1.0) * progressFactor;
-      const saveRate = scenario.social.metrics.saveRateFrom + (scenario.social.metrics.saveRateTo - scenario.social.metrics.saveRateFrom) * progressFactor;
+    // Trigger updates
+    const socialEvents = getSocialEvents(scenario);
+    const adsEvents = getAdsEvents(scenario);
+    const llmoEvents = getLlmoEvents(scenario);
 
-      newSocialMetrics = { reach, save, engagement, saveRate };
+    const socialUpdate = processAgentUpdate('social', state.socialState, socialEvents);
+    const adsUpdate = processAgentUpdate('ads', state.adsState, adsEvents);
+    const llmoUpdate = processAgentUpdate('llmo', state.llmoState, llmoEvents);
 
-      // Give posts likes & engagement
-      newSocialPosts = newSocialPosts.map((p, idx) => {
-        const baseLikes = 250 + (idx * 150);
-        return {
-          ...p,
-          likes: Math.round(baseLikes * reach),
-          comments: Math.round((baseLikes / 15) * engagement),
-          shares: Math.round((baseLikes / 20) * save),
-        };
-      });
-    }
-
-    // ----------------------------------------------------
-    // ADS AGENT ENGINE
-    // ----------------------------------------------------
-    let newAdsProgress = state.adsStepProgress + (dtMs / state.adsStepDuration) * 100;
-    let newAdsStepIndex = state.adsStepIndex;
-    let newAdsStepDuration = state.adsStepDuration;
-
-    if (newAdsProgress >= 100) {
-      if (state.adsStepIndex < 3) {
-        newAdsStepIndex += 1;
-        newAdsProgress = 0;
-        newAdsStepDuration = resolveStepDuration(ADS_STEP_DEFAULTS[newAdsStepIndex].baseMs, speed, jitter);
-      } else {
-        // Complete or loop
-        if (state.isLoop) {
-          newAdsStepIndex = 0;
-          newAdsProgress = 0;
-          newAdsStepDuration = resolveStepDuration(ADS_STEP_DEFAULTS[0].baseMs, speed, jitter);
-        } else {
-          newAdsProgress = 100;
-        }
-      }
-    }
-
-    let newAdsLogsVisible = [...state.adsStrategyLogsVisible];
-    let newAdsCampaigns = [...state.adsCampaigns];
-    let newAdsMetrics = { ...state.adsMetrics };
-
-    if (newAdsStepIndex === 0) {
-      // Step 0: Strategy Log sequential
-      const logLinesCount = scenario.ads.strategyLogs.length;
-      const visibleCount = Math.min(
-        logLinesCount,
-        Math.floor((newAdsProgress / 100) * (logLinesCount + 1))
-      );
-      newAdsLogsVisible = scenario.ads.strategyLogs.slice(0, visibleCount);
-      newAdsCampaigns = scenario.ads.campaigns.map(c => ({ ...c, status: 'pending', cpc: 0, cpa: 0, roas: 0 }));
-      newAdsMetrics = { sales: 0, cpa: scenario.ads.metrics.cpaFrom, roas: scenario.ads.metrics.roasFrom, spend: 0 };
-    } 
-    else if (newAdsStepIndex === 1) {
-      // Step 1: Creative Generation (campaigns: pending -> generating -> ready)
-      newAdsLogsVisible = scenario.ads.strategyLogs;
-      const totalCampaigns = newAdsCampaigns.length;
-      newAdsCampaigns = newAdsCampaigns.map((c, idx) => {
-        const triggerReady = (newAdsProgress / 100) * totalCampaigns;
-        if (triggerReady > idx + 0.5) {
-          return { ...c, status: 'ready' as const };
-        } else if (triggerReady > idx) {
-          return { ...c, status: 'generating' as const };
-        } else {
-          return { ...c, status: 'pending' as const };
-        }
-      });
-    }
-    else if (newAdsStepIndex === 2) {
-      // Step 2: Deploy & Meta submit (ready -> active)
-      newAdsCampaigns = newAdsCampaigns.map(c => ({ ...c, status: 'ready' }));
-      const totalCampaigns = newAdsCampaigns.length;
-      newAdsCampaigns = newAdsCampaigns.map((c, idx) => {
-        const triggerActive = (newAdsProgress / 100) * totalCampaigns;
-        if (triggerActive > idx) {
-          return { ...c, status: 'active' as const };
-        }
-        return c;
-      });
-    }
-    else if (newAdsStepIndex === 3) {
-      // Step 3: Dashboard data metrics count up & CPA decrease
-      newAdsCampaigns = newAdsCampaigns.map(c => ({ ...c, status: 'active' }));
-      
-      const progressFactor = newAdsProgress / 100;
-      
-      // Calculate CPA curve (easOut: fast drop, then stable)
-      // CPA goes down, Sales goes up, ROAS goes up
-      const cpaCurve = 1 - Math.sin((progressFactor * Math.PI) / 2); // easeOut curve
-      const cpa = scenario.ads.metrics.cpaFrom - (scenario.ads.metrics.cpaFrom - scenario.ads.metrics.cpaTo) * (1 - cpaCurve);
-      
-      const sales = scenario.ads.metrics.salesFrom + (scenario.ads.metrics.salesTo - scenario.ads.metrics.salesFrom) * progressFactor;
-      const roas = scenario.ads.metrics.roasFrom + (scenario.ads.metrics.roasTo - scenario.ads.metrics.roasFrom) * progressFactor;
-      const spend = sales / roas;
-
-      newAdsMetrics = { sales, cpa, roas, spend };
-
-      // Distribute KPI values to campaigns
-      newAdsCampaigns = newAdsCampaigns.map((c, idx) => {
-        const share = (idx === 1) ? 0.5 : 0.25; // campaign 2 does more
-        return {
-          ...c,
-          cpc: Math.round(75 + idx * 15 * (1 - progressFactor * 0.2)),
-          cpa: Math.round(cpa * (1 + (idx - 1) * 0.1)),
-          roas: Number((roas * (1 - (idx - 1) * 0.05)).toFixed(2))
-        };
-      });
-    }
-
-    // ----------------------------------------------------
-    // LLMO AGENT ENGINE
-    // ----------------------------------------------------
-    let newLlmoProgress = state.llmoStepProgress + (dtMs / state.llmoStepDuration) * 100;
-    let newLlmoStepIndex = state.llmoStepIndex;
-    let newLlmoStepDuration = state.llmoStepDuration;
-
-    if (newLlmoProgress >= 100) {
-      if (state.llmoStepIndex < 2) {
-        newLlmoStepIndex += 1;
-        newLlmoProgress = 0;
-        newLlmoStepDuration = resolveStepDuration(LLMO_STEP_DEFAULTS[newLlmoStepIndex].baseMs, speed, jitter);
-      } else {
-        if (state.isLoop) {
-          newLlmoStepIndex = 0;
-          newLlmoProgress = 0;
-          newLlmoStepDuration = resolveStepDuration(LLMO_STEP_DEFAULTS[0].baseMs, speed, jitter);
-        } else {
-          newLlmoProgress = 100;
-        }
-      }
-    }
-
-    let newLlmoScores = { ...state.llmoScores };
-    let newLlmoActions = [...state.llmoActions];
-    let newLlmoQueries = [...state.llmoQueries];
-
-    if (newLlmoStepIndex === 0) {
-      // Step 0: Audit Score (Baseline scores)
-      scenario.llmo.visibilityScores.forEach(s => {
-        newLlmoScores[s.model] = s.score;
-      });
-      newLlmoActions = scenario.llmo.actions.map(a => ({ ...a, status: 'pending' }));
-      newLlmoQueries = scenario.llmo.queries.map(q => ({ ...q, appeared: 'no' }));
-    }
-    else if (newLlmoStepIndex === 1) {
-      // Step 1: Actions Execution (pending -> running -> completed)
-      const totalActions = newLlmoActions.length;
-      newLlmoActions = newLlmoActions.map((action, idx) => {
-        const triggerProgress = (newLlmoProgress / 100) * totalActions;
-        if (triggerProgress > idx + 0.8) {
-          return { ...action, status: 'completed' as const };
-        } else if (triggerProgress > idx) {
-          return { ...action, status: 'running' as const };
-        } else {
-          return { ...action, status: 'pending' as const };
-        }
-      });
-
-      // Gradually increase scores slightly during execution
-      const progressFactor = newLlmoProgress / 100;
-      scenario.llmo.visibilityScores.forEach(s => {
-        const delta = Math.round(15 * progressFactor); // partial score gain
-        newLlmoScores[s.model] = s.score + delta;
-      });
-    }
-    else if (newLlmoStepIndex === 2) {
-      // Step 2: Final citations update (scores hit max, actions all completed, query checks pass)
-      newLlmoActions = newLlmoActions.map(a => ({ ...a, status: 'completed' }));
-      
-      const progressFactor = newLlmoProgress / 100;
-
-      // Scores hit target (e.g. baseline + 30-40 points)
-      scenario.llmo.visibilityScores.forEach(s => {
-        const targetBonus = 35; // e.g. 35 -> 70
-        newLlmoScores[s.model] = s.score + Math.round(targetBonus * progressFactor);
-      });
-
-      // Queries status transition
-      // Query 0: yes, Query 1: yes/partial, Query 2: yes
-      newLlmoQueries = scenario.llmo.queries.map((q, idx) => {
-        const trigger = (newLlmoProgress / 100) * 3;
-        if (trigger > idx) {
-          const finalState = (idx === 1) ? 'partial' as const : 'yes' as const;
-          return { ...q, appeared: finalState };
-        }
-        return q;
-      });
-    }
+    // 2. Update Global Progress (weighted based on index ratio)
+    const socialRatio = socialUpdate.eventIndex / socialEvents.length;
+    const adsRatio = adsUpdate.eventIndex / adsEvents.length;
+    const llmoRatio = llmoUpdate.eventIndex / llmoEvents.length;
+    const globalProgress = Math.min(100, Math.round(((socialRatio + adsRatio + llmoRatio) / 3) * 100));
 
     set({
-      socialStepIndex: newSocialStepIndex,
-      socialStepProgress: newSocialProgress,
-      socialStepDuration: newSocialStepDuration,
-      socialStrategyLogsVisible: newSocialLogsVisible,
-      socialPosts: newSocialPosts,
-      socialMetrics: newSocialMetrics,
-
-      adsStepIndex: newAdsStepIndex,
-      adsStepProgress: newAdsProgress,
-      adsStepDuration: newAdsStepDuration,
-      adsStrategyLogsVisible: newAdsLogsVisible,
-      adsCampaigns: newAdsCampaigns,
-      adsMetrics: newAdsMetrics,
-
-      llmoStepIndex: newLlmoStepIndex,
-      llmoStepProgress: newLlmoProgress,
-      llmoStepDuration: newLlmoStepDuration,
-      llmoScores: newLlmoScores,
-      llmoActions: newLlmoActions,
-      llmoQueries: newLlmoQueries
+      orchestratorProgress: globalProgress,
+      socialState: socialUpdate,
+      adsState: adsUpdate,
+      llmoState: llmoUpdate
     });
   }
 }));

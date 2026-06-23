@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useDemoStore } from '@/store/demoStore';
+import TerminalLog from '@/components/TerminalLog';
 import { 
   LineChart, 
   Line, 
@@ -21,7 +22,9 @@ import {
   CheckCircle, 
   Link as LinkIcon, 
   RefreshCw,
-  Play
+  Play,
+  Clock,
+  Cpu
 } from 'lucide-react';
 
 const MetaIcon = () => (
@@ -47,10 +50,8 @@ export default function AdsAgentPage() {
   const scenarios = useDemoStore((state) => state.scenarios);
   const scenario = scenarios.find(s => s.id === activeScenarioId) || scenarios[0];
 
-  // Zustand states for Ads
-  const adsStepIndex = useDemoStore((state) => state.adsStepIndex);
-  const adsStepProgress = useDemoStore((state) => state.adsStepProgress);
-  const strategyLogs = useDemoStore((state) => state.adsStrategyLogsVisible);
+  // Zustand states for Ads (v2.0 Event-driven)
+  const adsState = useDemoStore((state) => state.adsState);
   const campaigns = useDemoStore((state) => state.adsCampaigns);
   const metrics = useDemoStore((state) => state.adsMetrics);
 
@@ -63,42 +64,34 @@ export default function AdsAgentPage() {
     setIsMounted(true);
   }, []);
 
-  // Auto-switch tabs based on step index to showcase the flow naturally
+  // Auto-switch tabs based on task progress to showcase the flow naturally
+  const a4Task = adsState.tasks.find(t => t.id === 'a4');
   useEffect(() => {
-    if (adsStepIndex === 0 || adsStepIndex === 1 || adsStepIndex === 2) {
-      setActiveTab('generate');
-    } else if (adsStepIndex === 3) {
+    if (a4Task?.status === 'running' || a4Task?.status === 'completed') {
       setActiveTab('dashboard');
+    } else {
+      setActiveTab('generate');
     }
-  }, [adsStepIndex]);
+  }, [a4Task?.status]);
 
   // Format currency
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(val);
   };
 
-  // Recharts line chart data
-  // Generate curve based on current sales metric
+  // Recharts line chart data (Smooth, deterministic progression based on metrics.sales)
   const getLineData = () => {
     const totalSales = metrics.sales;
-    const baseData = [
-      { name: 'Day 1', Sales: 0 },
-      { name: 'Day 2', Sales: 0 },
-      { name: 'Day 3', Sales: 0 },
-      { name: 'Day 4', Sales: 0 },
-      { name: 'Day 5', Sales: 0 },
-      { name: 'Day 6', Sales: 0 },
-      { name: 'Day 7', Sales: 0 }
+    const coefficients = [0, 0.12, 0.28, 0.45, 0.62, 0.81, 1.0];
+    return [
+      { name: 'Day 1', Sales: Math.round(totalSales * coefficients[0]) },
+      { name: 'Day 2', Sales: Math.round(totalSales * coefficients[1]) },
+      { name: 'Day 3', Sales: Math.round(totalSales * coefficients[2]) },
+      { name: 'Day 4', Sales: Math.round(totalSales * coefficients[3]) },
+      { name: 'Day 5', Sales: Math.round(totalSales * coefficients[4]) },
+      { name: 'Day 6', Sales: Math.round(totalSales * coefficients[5]) },
+      { name: 'Day 7', Sales: Math.round(totalSales * coefficients[6]) }
     ];
-    
-    // Linearly interpolate graph based on progress
-    return baseData.map((d, idx) => {
-      const scale = idx / 6;
-      return {
-        ...d,
-        Sales: Math.round(totalSales * scale * (0.85 + Math.random() * 0.2))
-      };
-    });
   };
 
   // Recharts donut chart data
@@ -135,7 +128,7 @@ export default function AdsAgentPage() {
           </button>
           <button
             onClick={() => setActiveTab('generate')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer relative ${
               activeTab === 'generate' 
                 ? 'bg-bg-surface text-text-primary shadow-sm' 
                 : 'text-text-secondary hover:text-text-primary'
@@ -143,8 +136,8 @@ export default function AdsAgentPage() {
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Campaign Generator</span>
-            {adsStepIndex < 3 && (
-              <span className="w-1.5 h-1.5 bg-brand rounded-full animate-ping" />
+            {adsState.status === 'running' && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand rounded-full animate-ping" />
             )}
           </button>
           <button
@@ -297,50 +290,75 @@ export default function AdsAgentPage() {
             </div>
 
             {/* AI strategy typing logs */}
-            <div className="bg-bg-subtle rounded-xl p-4 font-mono text-[11px] leading-relaxed text-text-secondary space-y-2 border border-border-custom min-h-[160px]">
-              {strategyLogs.map((log, idx) => (
-                <div key={idx} className="flex items-start gap-2 animate-fade-in">
-                  <span className="text-brand font-bold select-none">&gt;</span>
-                  <span>{log}</span>
-                </div>
-              ))}
-              {adsStepProgress < 100 && (
-                <div className="flex items-center gap-1.5 pl-4 text-text-muted mt-2 animate-pulse text-[10px]">
-                  <RefreshCw className="w-3 h-3 animate-spin text-brand" />
-                  <span>アセット及び配信面最適化パラメータを算出中...</span>
-                </div>
-              )}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-xs font-bold text-text-secondary px-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="w-3.5 h-3.5 text-brand" />
+                  Orchestrator Log Stream (stdout)
+                </span>
+                <span className="text-[10px] font-mono text-text-muted">Jitter: Active</span>
+              </div>
+              <TerminalLog 
+                logs={adsState.logs} 
+                isRunning={adsState.status === 'running'} 
+                maxHeightClass="h-72" 
+                placeholderText="Ad入札ポート同期待機中..." 
+              />
             </div>
 
             {/* Mini flow status indicators */}
             <div className="space-y-3 pt-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-text-secondary flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${adsStepIndex >= 0 ? 'bg-brand' : 'bg-border-strong'}`} />
-                  戦略・ターゲットアロケーション
-                </span>
-                <span className="font-semibold text-text-primary">
-                  {adsStepIndex > 0 ? '完了 ✓' : adsStepIndex === 0 ? '実行中' : '待機中'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-text-secondary flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${adsStepIndex >= 1 ? 'bg-brand' : 'bg-border-strong'}`} />
-                  クリエイティブ自動バリエーション生成
-                </span>
-                <span className="font-semibold text-text-primary">
-                  {adsStepIndex > 1 ? '完了 ✓' : adsStepIndex === 1 ? '実行中' : '待機中'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-text-secondary flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${adsStepIndex >= 2 ? 'bg-brand' : 'bg-border-strong'}`} />
-                  Meta / Google Ads API 送信・デプロイ
-                </span>
-                <span className="font-semibold text-text-primary">
-                  {adsStepIndex > 2 ? '配信中 ✓' : adsStepIndex === 2 ? '送信中' : '待機中'}
-                </span>
-              </div>
+              {adsState.tasks.map((task) => {
+                const isPending = task.status === 'pending';
+                const isRunning = task.status === 'running';
+                const isCompleted = task.status === 'completed';
+
+                return (
+                  <div 
+                    key={task.id} 
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all duration-300 ${
+                      isCompleted 
+                        ? 'border-positive/20 bg-positive/5' 
+                        : isRunning 
+                          ? 'border-brand bg-brand-soft/20 shadow-xs' 
+                          : 'border-border-custom bg-bg-surface'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-1 rounded-lg ${
+                        isCompleted 
+                          ? 'bg-positive/10 text-positive' 
+                          : isRunning 
+                            ? 'bg-brand text-white animate-pulse' 
+                            : 'bg-bg-subtle text-text-muted'
+                      }`}>
+                        {isCompleted ? (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        ) : isRunning ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Clock className="w-3.5 h-3.5" />
+                        )}
+                      </div>
+                      <span className={`text-xs font-bold ${
+                        isCompleted 
+                          ? 'text-text-secondary line-through' 
+                          : isRunning 
+                            ? 'text-text-primary font-bold' 
+                            : 'text-text-muted'
+                      }`}>
+                        {task.label}
+                      </span>
+                    </div>
+
+                    {isCompleted && task.elapsed && (
+                      <span className="text-[10px] text-positive font-mono font-bold bg-positive/10 px-1.5 py-0.5 rounded">
+                        {task.elapsed}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -349,7 +367,7 @@ export default function AdsAgentPage() {
             <div>
               <div className="flex justify-between items-center pb-3 border-b border-border-custom">
                 <h3 className="text-sm font-bold text-text-primary">自動生成広告キャンペーンアセット</h3>
-                <span className="text-[10px] text-text-muted font-mono">Status: {adsStepIndex === 3 ? 'Active (All deployed)' : 'Processing...'}</span>
+                <span className="text-[10px] text-text-muted font-mono">Status: {adsState.status === 'completed' ? 'Active (All deployed)' : 'Processing...'}</span>
               </div>
 
               <div className="mt-4 space-y-4">
@@ -409,17 +427,17 @@ export default function AdsAgentPage() {
               </div>
             </div>
 
-            {adsStepIndex === 2 && (
+            {adsState.tasks.find(t => t.id === 'a3')?.status === 'running' && (
               <div className="p-3.5 bg-brand-soft border border-brand/10 rounded-xl text-brand-strong text-[10px] flex items-center gap-2.5 animate-pulse mt-4">
                 <CheckCircle className="w-4 h-4" />
                 <span>Meta および Google API 経由での最終審査・キャンペーン構築リクエストを処理中...</span>
               </div>
             )}
             
-            {adsStepIndex === 3 && (
+            {adsState.tasks.find(t => t.id === 'a4')?.status === 'completed' && (
               <div className="p-3.5 bg-positive/10 border border-positive/10 rounded-xl text-positive text-[10px] flex items-center gap-2.5 mt-4">
                 <CheckCircle className="w-4 h-4" />
-                <span>3個の自動生成キャンペーンが配信面に正常にデプロイされました。自動運用中。</span>
+                <span>3個 of 自動生成キャンペーンが配信面に正常にデプロイされました。自動運用中。</span>
               </div>
             )}
 
@@ -593,14 +611,14 @@ export default function AdsAgentPage() {
                 </thead>
                 <tbody className="divide-y divide-border-custom font-medium">
                   {campaigns.map((c) => (
-                    <tr key={c.id} className="text-text-secondary">
-                      <td className="py-3 text-text-primary font-bold">{c.name}</td>
-                      <td className="py-3 font-mono">{c.platform}</td>
+                    <tr key={c.id} className="text-text-secondary font-mono">
+                      <td className="py-3 text-text-primary font-bold font-sans">{c.name}</td>
+                      <td className="py-3">{c.platform}</td>
                       <td className="py-3 tabular-nums">¥{c.cpc}</td>
                       <td className="py-3 text-negative font-bold tabular-nums">¥{c.cpa.toLocaleString()}</td>
                       <td className="py-3 text-brand-strong font-bold tabular-nums">{c.roas}x</td>
                       <td className="py-3 text-right">
-                        <span className="px-2 py-0.5 bg-positive/10 text-positive rounded-full text-[9px] font-bold">
+                        <span className="px-2 py-0.5 bg-positive/10 text-positive rounded-full text-[9px] font-bold font-sans">
                           最適化適用済
                         </span>
                       </td>
