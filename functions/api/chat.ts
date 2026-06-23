@@ -1,22 +1,16 @@
-import { NextRequest } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
-
-export const runtime = 'edge'; // Cloudflare-compatible edge runtime
-
-export async function POST(req: NextRequest) {
+export const onRequestPost = async (context: any) => {
   try {
-    const { messages, agentContext } = await req.json();
+    const { request, env } = context;
+    const { messages, agentContext } = await request.json();
     const lastMessage = messages[messages.length - 1]?.content || '';
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      // APIキーがない場合のフォールバック（デモ用ダミー応答ストリーミング）
       const mockResponse = getMockResponse(lastMessage, agentContext);
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
-          // モックテキストを少しずつ送信する
           const chunks = mockResponse.match(/.{1,4}/g) || [mockResponse];
           for (const chunk of chunks) {
             controller.enqueue(encoder.encode(chunk));
@@ -30,30 +24,40 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
-    
-    // システムプロンプトの設定
     const systemInstruction = `あなたはCorebergの自律型AIマーケティングOrchestratorデモで動作するAIアシスタントです。ピッチ資料を閲覧している投資家からの質問に、洗練された品位ある日本語で簡潔に答えてください。
 現在閲覧中のコンテキスト: ${agentContext || '全体ダッシュボード'}。
 余計なダサい言葉遣い、過剰な絵文字、AIらしい定型文は避け、テックとしての凄みが伝わるように簡潔かつ論理的にお答えください。`;
 
-    const chatResponse = await ai.models.generateContentStream({
-      model: 'gemini-3.1-flash-lite',
-      contents: lastMessage,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      }
+    // Use gemini-2.5-flash or gemini-3.1-flash-lite via direct rest API
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const apiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: lastMessage }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        generationConfig: {
+          temperature: 0.7,
+        }
+      })
     });
 
+    if (!apiResponse.ok) {
+      const errorText = await apiResponse.text();
+      return new Response(`Gemini API Error: ${errorText}`, { status: 500 });
+    }
+
+    const data: any = await apiResponse.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '応答を生成できませんでした。';
+
+    // Stream the final text to the frontend so it types out smoothly
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
-        for await (const chunk of chatResponse) {
-          const text = chunk.text;
-          if (text) {
-            controller.enqueue(encoder.encode(text));
-          }
+        const chunks = text.match(/.{1,4}/g) || [text];
+        for (const chunk of chunks) {
+          controller.enqueue(encoder.encode(chunk));
+          await new Promise((resolve) => setTimeout(resolve, 20));
         }
         controller.close();
       },
@@ -63,10 +67,9 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     });
   } catch (error: any) {
-    console.error('Gemini API Error:', error);
-    return new Response('デモ環境でのリクエスト処理中にエラーが発生しました。現在、モックアップモードで代替稼働しています。', { status: 500 });
+    return new Response(`Error: ${error.message}`, { status: 500 });
   }
-}
+};
 
 function getMockResponse(message: string, context: string): string {
   const msg = message.toLowerCase();
