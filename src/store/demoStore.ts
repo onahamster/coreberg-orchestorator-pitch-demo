@@ -197,13 +197,13 @@ const INITIAL_PRESETS: Scenario[] = [
     },
     social: {
       posts: [
-        { id: 'p1', time: 'Mon 09:00', theme: '彫刻としてのプロダクトデザイン', image: '/images/aurali_earbuds_1.png', caption: '美学と技術の融合。アルミニウム削り出しによる継ぎ目のないフォルムが、耳元に彫刻のような静寂をもたらします。AURALIが生み出す、一切の無駄を省いた純粋なリスニング体験。', hashtags: ['aurali', 'minimaldesign', 'earbuds', 'audiophile'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p2', time: 'Tue 18:00', theme: 'ライフスタイルに溶け込む音', image: '/images/aurali_lifestyle_1.png', caption: '朝の静かな一杯と、AURALI。余計なノイズを完全に遮断し、お気に入りの旋律だけを心に届ける。あなたの集中力を邪魔しない、まるで空気のような存在です。', hashtags: ['minimalist', 'workspace', 'coffeeandmusic', 'anc'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p3', time: 'Wed 12:00', theme: 'ノイズキャンセリングの工学', image: '/images/aurali_earbuds_1.png', caption: '45dBの騒音カットと、独自の気圧感知センサー。都市の喧騒の中にいることを忘れるほど、静寂はパーソナルになります。驚異の遮音性を支える、極小の精密パーツ群。', hashtags: ['soundtech', 'acoustic', 'minimalism', 'premiumtech'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p4', time: 'Thu 20:00', theme: 'デザイナーによるインプレッション', image: '/images/aurali_lifestyle_1.png', caption: '「ただのイヤホンではなく、耳につけるモダンなオブジェ」。著名インダストリアルデザイナーが語る、AURALIのデザインフィロソフィーとその機能美。', hashtags: ['designphilosophy', 'object', 'craftsmanship', 'industrialdesign'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p5', time: 'Fri 17:00', theme: '週末のディテール', image: '/images/aurali_earbuds_1.png', caption: '旅立ち of 瞬間も、お気に入りのサウンドトラックと共に。最大30時間のバッテリーライフで、途切れることのない静寂と高揚感を提供します。', hashtags: ['traveltech', 'audio', 'earphones', 'luxurybrand'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p6', time: 'Sat 10:00', theme: '静寂を身にまとう', image: '/images/aurali_lifestyle_1.png', caption: 'どんな装いにも、スマートに溶け込む。過剰な主張を削ぎ落とし、マテリアル本来の美しさを引き出したAURALIが、あなたの日常の質を高めます。', hashtags: ['minimalfashion', 'techaccessories', 'soundscape', 'dailyroutine'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p7', time: 'Sun 15:00', theme: '音質の純粋性への問い', image: '/images/aurali_earbuds_1.png', caption: '原音にどこまで忠実でいられるか。AURALI独自のカスタムドライバーが奏でる、歪みのない澄み渡るような高音と、深くタイトな低音。', hashtags: ['hifi', 'soundart', 'minimalaesthetic', 'premium'], likes: 0, comments: 0, shares: 0, status: 'pending' }
+        { id: 'p1', time: 'Mon 09:00', theme: '彫刻としてのプロダクトデザイン', image: '/images/aurali_post1.png', caption: '美学と技術の融合。アルミニウム削り出しによる継ぎ目のないフォルムが、耳元に彫刻のような静寂をもたらします。AURALIが生み出す、一切の無駄を省いた純粋なリスニング体験。', hashtags: ['aurali', 'minimaldesign', 'earbuds', 'audiophile'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p2', time: 'Tue 18:00', theme: 'ライフスタイルに溶け込む音', image: '/images/aurali_post2.png', caption: '朝の静かな一杯と、AURALI。余計なノイズを完全に遮断し、お気に入りの旋律だけを心に届ける。あなたの集中力を邪魔しない、まるで空気のような存在です。', hashtags: ['minimalist', 'workspace', 'coffeeandmusic', 'anc'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p3', time: 'Wed 12:00', theme: 'ノイズキャンセリングの工学', image: '/images/aurali_post3.png', caption: '45dBの騒音カットと、独自の気圧感知センサー。都市の喧騒の中にいることを忘れるほど、静寂はパーソナルになります。驚異の遮音性を支える、極小の精密パーツ群。', hashtags: ['soundtech', 'acoustic', 'minimalism', 'premiumtech'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p4', time: 'Thu 20:00', theme: 'デザイナーによるインプレッション', image: '/images/aurali_post4.png', caption: '「ただのイヤホンではなく、耳につけるモダンなオブジェ」。著名インダストリアルデザイナーが語る、AURALIのデザインフィロソフィーとその機能美。', hashtags: ['designphilosophy', 'object', 'craftsmanship', 'industrialdesign'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p5', time: 'Fri 17:00', theme: '週末のディテール', image: '/images/aurali_post5.png', caption: '旅立ち of 瞬間も、お気に入りのサウンドトラックと共に。最大30時間のバッテリーライフで、途切れることのない静寂と高揚感を提供します。', hashtags: ['traveltech', 'audio', 'earphones', 'luxurybrand'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p6', time: 'Sat 10:00', theme: '静寂を身にまとう', image: '/images/aurali_post6.png', caption: 'どんな装いにも、スマートに溶け込む。過剰な主張を削ぎ落とし、マテリアル本来の美しさを引き出したAURALIが、あなたの日常の質を高めます。', hashtags: ['minimalfashion', 'techaccessories', 'soundscape', 'dailyroutine'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p7', time: 'Sun 15:00', theme: '音質の純粋性への問い', image: '/images/aurali_post7.png', caption: '原音にどこまで忠実でいられるか。AURALI独自のカスタムドライバーが奏でる、歪みのない澄み渡るような高音と、深くタイトな低音。', hashtags: ['hifi', 'soundart', 'minimalaesthetic', 'premium'], likes: 0, comments: 0, shares: 0, status: 'pending' }
       ],
       metrics: {
         reachRatio: 2.5,
@@ -216,9 +216,9 @@ const INITIAL_PRESETS: Scenario[] = [
     ads: {
       connections: { Meta: true, Google: true, TikTok: false },
       campaigns: [
-        { id: 'c1', name: 'AURALI_Brand_Concept_Meta', platform: 'Meta', budget: '¥5,000 / 日', status: 'pending', image: '/images/aurali_earbuds_1.png', cpc: 0, cpa: 0, roas: 0 },
-        { id: 'c2', name: 'AURALI_Sound_Tech_Google', platform: 'Google', budget: '¥8,000 / 日', status: 'pending', image: '/images/aurali_lifestyle_1.png', cpc: 0, cpa: 0, roas: 0 },
-        { id: 'c3', name: 'AURALI_Lifestyle_Video_Meta', platform: 'Meta', budget: '¥6,000 / 日', status: 'pending', image: '/images/aurali_lifestyle_1.png', cpc: 0, cpa: 0, roas: 0 }
+        { id: 'c1', name: 'AURALI_Brand_Concept_Meta', platform: 'Meta', budget: '¥5,000 / 日', status: 'pending', image: '/images/aurali_post1.png', cpc: 0, cpa: 0, roas: 0 },
+        { id: 'c2', name: 'AURALI_Sound_Tech_Google', platform: 'Google', budget: '¥8,000 / 日', status: 'pending', image: '/images/aurali_post3.png', cpc: 0, cpa: 0, roas: 0 },
+        { id: 'c3', name: 'AURALI_Lifestyle_Video_Meta', platform: 'Meta', budget: '¥6,000 / 日', status: 'pending', image: '/images/aurali_post6.png', cpc: 0, cpa: 0, roas: 0 }
       ],
       metrics: {
         salesFrom: 120000,
@@ -274,13 +274,13 @@ const INITIAL_PRESETS: Scenario[] = [
     },
     social: {
       posts: [
-        { id: 'p1', time: 'Mon 10:00', theme: 'リネン素材の持つ独自の呼吸', image: '/images/lin_apparel_1.png', caption: '丁寧に手摘みされた天然リネン。自然なシワと、空気を含むような軽やかさが、日々の装いに上質な心地よさを与えます。LINが追求する、エフォートレスな美学。', hashtags: ['linapparel', 'linenwear', 'slowfashion', 'genderless'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p2', time: 'Tue 19:00', theme: 'ギャラリーに溶け込むシルエット', image: '/images/lin_apparel_2.png', caption: '直線の美しさと、身体の動きに寄り添うドレープ。過剰な装飾をすべて取り払い、まとう人の個性を引き立てるライトベージュのウールコート。', hashtags: ['minimalism', 'fashionpost', 'gallerylook', 'sustainablefashion'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p3', time: 'Wed 13:00', theme: 'タイムレスであることの意味', image: '/images/lin_apparel_1.png', caption: 'ワンシーズンで終わらない服作り。何年経っても色褪せないクラフトマンシップと、強度に優れたオーガニック繊維の織り。', hashtags: ['timeless', 'qualityfabrics', 'craftsmanship', 'organicclothing'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p4', time: 'Thu 21:00', theme: '静寂の中のクローズアップ', image: '/images/lin_apparel_2.png', caption: '「ただ着るのではなく、空間と調和する」。生地のテクスチャとカッティングの妙が、身にまとうだけで姿勢と心を正してくれます。', hashtags: ['minimalistfashion', 'simplelife', 'texturelove', 'architecturalfashion'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p5', time: 'Fri 18:00', theme: '金曜日のリラックスシルエット', image: '/images/lin_apparel_1.png', caption: 'オンとオフの境界線をあいまいに。どんなシーンでも気負わず着こなせる、ニュートラルカラーのコンフォートフィットシャツ。', hashtags: ['comfortfit', 'neutrals', 'weekendstyle', 'cleanlines'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p6', time: 'Sat 11:00', theme: '日常の彫刻', image: '/images/lin_apparel_2.png', caption: 'コンクリートの美しさと調和する、LINのフォルム。都会の慌ただしさから切り離されたような、凛とした佇まいを演出します。', hashtags: ['cityscape', 'minimaldesign', 'fashionart', 'modernist'], likes: 0, comments: 0, shares: 0, status: 'pending' },
-        { id: 'p7', time: 'Sun 16:00', theme: 'ディテールに宿る持続可能性', image: '/images/lin_apparel_1.png', caption: 'ボタンひとつ、縫い糸ひとつまで。環境への配慮と品質の妥協のない両立が、これからのアパレルのスタンダードに。', hashtags: ['eco-friendly', 'standards', 'sustainablelifestyle', 'minimaliststyle'], likes: 0, comments: 0, shares: 0, status: 'pending' }
+        { id: 'p1', time: 'Mon 10:00', theme: 'リネン素材の持つ独自の呼吸', image: '/images/lin_post1.png', caption: '丁寧に手摘みされた天然リネン。自然なシワと、空気を含むような軽やかさが、日々の装いに上質な心地よさを与えます。LINが追求する、エフォートレスな美学。', hashtags: ['linapparel', 'linenwear', 'slowfashion', 'genderless'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p2', time: 'Tue 19:00', theme: 'ギャラリーに溶け込むシルエット', image: '/images/lin_post2.png', caption: '直線の美しさと、身体の動きに寄り添うドレープ。過剰な装飾をすべて取り払い、まとう人の個性を引き立てるライトベージュのウールコート。', hashtags: ['minimalism', 'fashionpost', 'gallerylook', 'sustainablefashion'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p3', time: 'Wed 13:00', theme: 'タイムレスであることの意味', image: '/images/lin_post3.png', caption: 'ワンシーズンで終わらない服作り。何年経っても色褪せないクラフトマンシップと、強度に優れたオーガニック繊維の織り。', hashtags: ['timeless', 'qualityfabrics', 'craftsmanship', 'organicclothing'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p4', time: 'Thu 21:00', theme: '静寂の中のクローズアップ', image: '/images/lin_post4.png', caption: '「ただ着るのではなく、空間と調和する」。生地のテクスチャとカッティングの妙が、身にまとうだけで姿勢と心を正してくれます。', hashtags: ['minimalistfashion', 'simplelife', 'texturelove', 'architecturalfashion'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p5', time: 'Fri 18:00', theme: '金曜日のリラックスシルエット', image: '/images/lin_post5.png', caption: 'オンとオフの境界線をあいまいに。どんなシーンでも気負わず着こなせる、ニュートラルカラー of コンフォートフィットシャツ。', hashtags: ['comfortfit', 'neutrals', 'weekendstyle', 'cleanlines'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p6', time: 'Sat 11:00', theme: '日常の彫刻', image: '/images/lin_post6.png', caption: 'コンクリートの美しさと調和する、LINのフォルム。都会の慌ただしさから切り離されたような、凛とした佇まいを演出します。', hashtags: ['cityscape', 'minimaldesign', 'fashionart', 'modernist'], likes: 0, comments: 0, shares: 0, status: 'pending' },
+        { id: 'p7', time: 'Sun 16:00', theme: 'ディテールに宿る持続可能性', image: '/images/lin_post7.png', caption: 'ボタンひとつ、縫い糸ひとつまで。環境への配慮と品質の妥協のない両立が、これからのアパレルのスタンダードに。', hashtags: ['eco-friendly', 'standards', 'sustainablelifestyle', 'minimaliststyle'], likes: 0, comments: 0, shares: 0, status: 'pending' }
       ],
       metrics: {
         reachRatio: 2.2,
@@ -293,9 +293,9 @@ const INITIAL_PRESETS: Scenario[] = [
     ads: {
       connections: { Meta: true, Google: false, TikTok: true },
       campaigns: [
-        { id: 'c1', name: 'LIN_Minimalism_Concept_Meta', platform: 'Meta', budget: '¥6,000 / 日', status: 'pending', image: '/images/lin_apparel_1.png', cpc: 0, cpa: 0, roas: 0 },
-        { id: 'c2', name: 'LIN_Linen_Nature_TikTok', platform: 'TikTok', budget: '¥5,000 / 日', status: 'pending', image: '/images/lin_apparel_1.png', cpc: 0, cpa: 0, roas: 0 },
-        { id: 'c3', name: 'LIN_Gallery_Style_Meta', platform: 'Meta', budget: '¥7,000 / 日', status: 'pending', image: '/images/lin_apparel_2.png', cpc: 0, cpa: 0, roas: 0 }
+        { id: 'c1', name: 'LIN_Minimalism_Concept_Meta', platform: 'Meta', budget: '¥6,000 / 日', status: 'pending', image: '/images/lin_post2.png', cpc: 0, cpa: 0, roas: 0 },
+        { id: 'c2', name: 'LIN_Linen_Nature_TikTok', platform: 'TikTok', budget: '¥5,000 / 日', status: 'pending', image: '/images/lin_post1.png', cpc: 0, cpa: 0, roas: 0 },
+        { id: 'c3', name: 'LIN_Gallery_Style_Meta', platform: 'Meta', budget: '¥7,000 / 日', status: 'pending', image: '/images/lin_post4.png', cpc: 0, cpa: 0, roas: 0 }
       ],
       metrics: {
         salesFrom: 85000,
