@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 余計なダサい言葉遣い、過剰な絵文字、AIらしい定型文は避け、テックとしての凄みが伝わるように簡潔かつ論理的にお答えください。`;
 
     const chatResponse = await ai.models.generateContentStream({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: lastMessage,
       config: {
         systemInstruction,
