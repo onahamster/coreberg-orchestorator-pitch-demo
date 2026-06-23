@@ -556,7 +556,7 @@ const createInitialAgentState = (tasks: TaskItem[]): AgentState => ({
 
 export const useDemoStore = create<DemoState>((set, get) => ({
   // Scenarios list & active
-  scenarios: loadFromStorage<Scenario[]>('coreberg_scenarios', INITIAL_PRESETS),
+  scenarios: loadFromStorage<Scenario[]>('coreberg_scenarios_v2.0', INITIAL_PRESETS),
   activeScenarioId: loadFromStorage<string>('coreberg_active_id', 'aurali'),
   
   // Playback Settings
@@ -710,7 +710,7 @@ export const useDemoStore = create<DemoState>((set, get) => ({
     const state = get();
     const updatedScenarios = state.scenarios.map(s => s.id === updated.id ? updated : s);
     set({ scenarios: updatedScenarios });
-    saveToStorage('coreberg_scenarios', updatedScenarios);
+    saveToStorage('coreberg_scenarios_v2.0', updatedScenarios);
     
     if (state.activeScenarioId === updated.id) {
       get().resetDemo();
