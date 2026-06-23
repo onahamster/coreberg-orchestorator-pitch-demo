@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  /* ベース：純白でなく、ごく僅かにシアン寄りの白 */
+  --bg-base: #FBFDFD;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F4F8F8;
+
+  /* ボーダー：グレーでなく、シアン寄りの極薄 */
+  --border: #E6EDED;
+  --border-strong: #D2DCDC;
+
+  /* テキスト：黒でなく、僅かに寒色の濃グレー */
+  --text-primary: #0E1A1B;
+  --text-secondary: #5A6A6B;
+  --text-muted: #93A1A1;
+
+  /* ブランド：本当に大事な1箇所だけ */
+  --brand: #0bbfca;
+  --brand-soft: #E3F7F8;
+  --brand-strong: #0892a0;
+
+  /* セマンティック */
+  --positive: #0d9f6e;
+  --negative: #e5484d;
+  --warning: #d99000;
+
+  /* シャドウ：黒でなくブランド温度 of 影 */
+  --shadow-sm: 0 1px 2px rgba(11, 40, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(11, 40, 42, 0.06);
+  --shadow-lg: 0 12px 40px rgba(11, 40, 42, 0.08);
+}
+
+@theme {
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-subtle: var(--bg-subtle);
+  
+  --color-border-custom: var(--border);
+  --color-border-strong: var(--border-strong);
+  
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-strong: var(--brand-strong);
+  
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --font-sans: var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* 等幅数値 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* スクロールバーのカスタマイズ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
